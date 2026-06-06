@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ANALYST
+}
+
+enum DatasetSource {
+  ALPHA_VANTAGE
+  CSV_UPLOAD
+}
+
+enum DatasetStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum CandleInterval {
+  ONE_MINUTE
+  FIVE_MINUTES
+  FIFTEEN_MINUTES
+  THIRTY_MINUTES
+  SIXTY_MINUTES
+}
+
+enum Direction {
+  BULLISH
+  BEARISH
+  FLAT
+  UNKNOWN
+}
+
+enum ReportModule {
+  CONTEXT_VS_REGULAR
+  GAP_ANALYSIS
+  DAY_OF_WEEK
+  SESSION_CONTINUATION
+  SESSION_REVERSAL
+  RANGE_EXPANSION
+  HIGH_LOW_BREAKS
+  OPENING_DRIVE
+  OPENING_RANGE
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum StudyStatus {
+  DRAFT
+  SAVED
+  ARCHIVED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String
+  role         UserRole      @default(OWNER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  datasets     Dataset[]
+  reportRuns   ReportRun[]
+  studies      SavedStudy[]
+  chatSessions ChatSession[]
+}
+
+model Dataset {
+  id                String          @id @default(cuid())
+  ownerId           String
+  owner             User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name              String
+  ticker            String
+  source            DatasetSource
+  status            DatasetStatus   @default(PENDING)
+  interval          CandleInterval  @default(FIVE_MINUTES)
+  timezone          String          @default("America/New_York")
+  fromDate          DateTime?
+  toDate            DateTime?
+  candleCount       Int             @default(0)
+  tradingDayCount   Int             @default(0)
+  coverageScore     Float           @default(0)
+  metadata          Json            @default("{}")
+  failureReason     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  candles           Candle[]
+  tradingDays       TradingDay[]
+  ingestionJobs     IngestionJob[]
+  reportRuns        ReportRun[]
+  studies           SavedStudy[]
+  chatSessions      ChatSession[]
+
+  @@index([ownerId, ticker])
+  @@index([status, source])
+}
+
+model Candle {
+  id        String         @id @default(cuid())
+  datasetId String
+  dataset   Dataset        @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  ticker    String
+  timestamp DateTime       @db.Timestamptz(6)
+  interval  CandleInterval
+  open      Decimal        @db.Decimal(18, 6)
+  high      Decimal        @db.Decimal(18, 6)
+  low       Decimal        @db.Decimal(18, 6)
+  close     Decimal        @db.Decimal(18, 6)
+  volume    BigInt         @default(0)
+  source    DatasetSource
+  raw        Json?
+  createdAt DateTime       @default(now())
+
+  @@unique([datasetId, timestamp, interval])
+  @@index([ticker, timestamp])
+}
+
+model TradingDay {
+  id                   String    @id @default(cuid())
+  datasetId            String
+  dataset              Dataset   @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  tradingDate          DateTime  @db.Date
+  weekday              Int
+  year                 Int
+  month                Int
+  contextOpen                  Decimal?  @db.Decimal(18, 6)
+  contextHigh                  Decimal?  @db.Decimal(18, 6)
+  contextLow                   Decimal?  @db.Decimal(18, 6)
+  contextClose                 Decimal?  @db.Decimal(18, 6)
+  contextMovePct               Float?
+  contextRangePct              Float?
+  contextDirection             Direction @default(UNKNOWN)
+  contextCandleCount           Int       @default(0)
+  regularOpen                  Decimal?  @db.Decimal(18, 6)
+  regularHigh                  Decimal?  @db.Decimal(18, 6)
+  regularLow                   Decimal?  @db.Decimal(18, 6)
+  regularClose                 Decimal?  @db.Decimal(18, 6)
+  regularMovePct               Float?
+  regularRangePct              Float?
+  regularDirection             Direction @default(UNKNOWN)
+  regularCandleCount           Int       @default(0)
+  regularOpenVsContextHighPct  Float?
+  regularOpenVsContextLowPct   Float?
+  regularBrokeContextHigh      Boolean   @default(false)
+  regularBrokeContextLow       Boolean   @default(false)
+  regularReversedContext       Boolean   @default(false)
+  openingRangeHigh     Decimal?  @db.Decimal(18, 6)
+  openingRangeLow      Decimal?  @db.Decimal(18, 6)
+  openingRangeBreak    Direction @default(UNKNOWN)
+  dataQualityScore     Float     @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([datasetId, tradingDate])
+  @@index([datasetId, year, month])
+  @@index([datasetId, weekday])
+  @@index([contextDirection, regularDirection])
+}
+
+model IngestionJob {
+  id            String        @id @default(cuid())
+  datasetId     String?
+  dataset       Dataset?      @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  source        DatasetSource
+  ticker        String
+  interval      CandleInterval
+  requestedFrom DateTime?
+  requestedTo   DateTime?
+  status        DatasetStatus @default(PENDING)
+  startedAt     DateTime      @default(now())
+  finishedAt    DateTime?
+  barsInserted  Int           @default(0)
+  error          String?
+  metadata      Json          @default("{}")
+}
+
+model ReportRun {
+  id               String       @id @default(cuid())
+  ownerId          String
+  owner            User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  datasetId        String?
+  dataset          Dataset?     @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  module           ReportModule
+  title            String
+  parameters       Json         @default("{}")
+  metrics          Json         @default("{}")
+  chartSpec        Json         @default("{}")
+  sourceDatasetIds String[]     @default([])
+  sql              String?
+  createdAt        DateTime     @default(now())
+
+  @@index([ownerId, module])
+  @@index([datasetId])
+}
+
+model SavedStudy {
+  id               String      @id @default(cuid())
+  ownerId          String
+  owner            User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  datasetId        String?
+  dataset          Dataset?    @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  title            String
+  thesis           String
+  status           StudyStatus @default(SAVED)
+  tags             String[]    @default([])
+  reportModules    String[]    @default([])
+  metrics          Json        @default("{}")
+  notes            String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([ownerId, status])
+}
+
+model ChatSession {
+  id               String        @id @default(cuid())
+  ownerId          String
+  owner            User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  datasetId        String?
+  dataset          Dataset?      @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  title            String
+  selectedReports  String[]      @default([])
+  sourceDatasetIds String[]      @default([])
+  saved            Boolean       @default(false)
+  messages         ChatMessage[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([ownerId, updatedAt])
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  chatSessionId String
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  role          ChatRole
+  content       String
+  metadata      Json        @default("{}")
+  createdAt     DateTime    @default(now())
+
+  @@index([chatSessionId, createdAt])
+}
