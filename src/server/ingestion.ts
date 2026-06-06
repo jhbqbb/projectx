@@ -1,32 +1,63 @@
 import { prisma } from "@/lib/prisma";
-import { fetchAlphaVantageIntraday, intervalToPrisma, normalizeNasdaqTicker, type AlphaVantageInterval } from "@/server/alpha-vantage";
-import { deriveTradingDaysFromCandles, type CandleInput } from "@/server/statistics";
+import {
+  fetchAlphaVantageDaily,
+  fetchAlphaVantageIntraday,
+  intervalToPrisma,
+  normalizeNasdaqTicker,
+  type AlphaVantageInterval
+} from "@/server/alpha-vantage";
+import { deriveTradingDaysFromCandles, deriveTradingDaysFromDailyCandles, type CandleInput } from "@/server/statistics";
 
 export async function ingestAlphaVantageDataset(params: {
   ownerId: string;
   ticker: string;
   interval?: AlphaVantageInterval;
   month?: string;
+  mode?: "auto" | "daily";
 }) {
   const ticker = normalizeNasdaqTicker(params.ticker);
   const interval = params.interval ?? "5min";
-  const intervalEnum = intervalToPrisma[interval];
+  const requestedIntervalEnum = intervalToPrisma[interval];
   const job = await prisma.ingestionJob.create({
     data: {
       source: "ALPHA_VANTAGE",
       ticker,
-      interval: intervalEnum,
+      interval: requestedIntervalEnum,
       metadata: { month: params.month ?? null }
     }
   });
 
   try {
-    const candles = await fetchAlphaVantageIntraday({
-      ticker,
-      interval,
-      month: params.month
-    });
-    const tradingDays = deriveTradingDaysFromCandles(candles, Number(interval.replace("min", "")));
+    let actualIntervalEnum: typeof requestedIntervalEnum | "DAILY" = requestedIntervalEnum;
+    let mode: "intraday" | "daily-fallback" = "intraday";
+    let fallbackReason: string | null = null;
+    let candles: CandleInput[];
+
+    if (params.mode === "daily") {
+      fallbackReason = "Daily mode requested.";
+      candles = await fetchAlphaVantageDaily({ ticker });
+      actualIntervalEnum = "DAILY";
+      mode = "daily-fallback";
+    } else {
+      try {
+        candles = await fetchAlphaVantageIntraday({
+          ticker,
+          interval,
+          month: params.month
+        });
+      } catch (error) {
+        fallbackReason = error instanceof Error ? error.message : "Intraday Alpha Vantage request failed.";
+        await new Promise((resolve) => setTimeout(resolve, 1300));
+        candles = await fetchAlphaVantageDaily({ ticker });
+        actualIntervalEnum = "DAILY";
+        mode = "daily-fallback";
+      }
+    }
+
+    const tradingDays =
+      mode === "daily-fallback"
+        ? deriveTradingDaysFromDailyCandles(candles)
+        : deriveTradingDaysFromCandles(candles, Number(interval.replace("min", "")));
     const fromDate = candles[0]?.timestamp;
     const toDate = candles[candles.length - 1]?.timestamp;
     const coverageScore = tradingDays.length
@@ -36,19 +67,30 @@ export async function ingestAlphaVantageDataset(params: {
     const dataset = await prisma.dataset.create({
       data: {
         ownerId: params.ownerId,
-        name: `${ticker} ${interval} ${params.month ?? "latest"}`,
+        name: mode === "daily-fallback" ? `${ticker} daily Alpha Vantage latest` : `${ticker} ${interval} ${params.month ?? "latest"}`,
         ticker,
         source: "ALPHA_VANTAGE",
         status: "PENDING",
-        interval: intervalEnum,
+        interval: actualIntervalEnum,
         fromDate,
         toDate,
         metadata: {
           alphaVantageMonth: params.month ?? null,
+          alphaVantageMode: mode,
+          fallbackReason,
           sessionDefinition: {
-            context: "04:00-09:25 America/New_York",
-            regular: "09:30-16:00 America/New_York",
-            note: "Alpha Vantage US equity extended-hours data does not cover the full overnight futures session."
+            context:
+              mode === "daily-fallback"
+                ? "Prior daily close -> current daily open"
+                : "04:00-09:25 America/New_York",
+            regular:
+              mode === "daily-fallback"
+                ? "Current daily open -> current daily close"
+                : "09:30-16:00 America/New_York",
+            note:
+              mode === "daily-fallback"
+                ? "Daily OHLCV fallback was used because the configured Alpha Vantage key could not access intraday data."
+                : "Alpha Vantage US equity extended-hours data does not cover the full overnight futures session."
           }
         }
       }
@@ -60,7 +102,7 @@ export async function ingestAlphaVantageDataset(params: {
           datasetId: dataset.id,
           ticker,
           timestamp: candle.timestamp,
-          interval: intervalEnum,
+          interval: actualIntervalEnum,
           open: candle.open,
           high: candle.high,
           low: candle.low,
@@ -116,6 +158,7 @@ export async function ingestAlphaVantageDataset(params: {
         where: { id: job.id },
         data: {
           datasetId: dataset.id,
+          interval: actualIntervalEnum,
           status: "READY",
           finishedAt: new Date(),
           barsInserted: candles.length

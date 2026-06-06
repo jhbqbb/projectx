@@ -24,6 +24,8 @@ The dashboard, reports, pattern explorer, session analyzer, and AI source panel 
 
 Alpha Vantage's US equity intraday endpoint supports extended-hours bars from 4:00am to 8:00pm Eastern Time. Because that feed does not cover the full overnight futures-style window, the built-in session engine uses a covered context session of 04:00 -> 09:25 ET and regular session from 09:30 ET. Use uploaded futures/CFD/index data when a complete overnight session is required.
 
+If the configured Alpha Vantage key cannot access intraday data, the ingestion service can use real Alpha Vantage daily OHLCV fallback. In daily mode, context is defined as prior daily close -> current daily open, and response is current daily open -> current daily close. This keeps the platform on real historical data while clearly warning that it is not full intraday session research.
+
 ## Report Modules
 
 - Context vs Regular Session

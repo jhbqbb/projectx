@@ -1,0 +1,1 @@
+ALTER TYPE "CandleInterval" ADD VALUE IF NOT EXISTS 'DAILY';

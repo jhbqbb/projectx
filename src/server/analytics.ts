@@ -15,6 +15,7 @@ type DatasetRecord = {
   fromDate: Date | null;
   toDate: Date | null;
   updatedAt: Date;
+  metadata: unknown;
   tradingDays: unknown[];
 };
 
@@ -184,10 +185,14 @@ export async function getAnalyticsSnapshot(params: { ownerId?: string | null; da
     }
 
     const patterns = findPatternCandidates(sessions);
+    const dataModeWarning =
+      dataset.interval === "DAILY"
+        ? "Alpha Vantage intraday data was unavailable for this key, so the platform is using real daily OHLCV fallback: prior close -> open context and open -> close response."
+        : "Alpha Vantage US equity intraday extended-hours coverage is 4:00am to 8:00pm ET; overnight futures-style sessions need a different data source.";
     const warnings = [
       ...(summary.sampleSize < 250 ? ["Sample size is modest. Treat this as descriptive research, not proof of an edge."] : []),
       ...(summary.confidence < 60 ? ["Confidence is below 60. Validate on a larger holdout period."] : []),
-      "Alpha Vantage US equity intraday extended-hours coverage is 4:00am to 8:00pm ET; overnight futures-style sessions need a different data source."
+      dataModeWarning
     ];
 
     return {

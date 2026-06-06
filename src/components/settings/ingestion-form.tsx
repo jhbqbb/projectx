@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export function IngestionForm() {
   const [interval, setIntervalValue] = useState("5min");
+  const [mode, setMode] = useState("daily");
   const [status, setStatus] = useState<{ tone: "success" | "error" | "idle"; message: string }>({
     tone: "idle",
     message: ""
@@ -31,6 +32,7 @@ export function IngestionForm() {
         body: JSON.stringify({
           ticker,
           interval,
+          mode,
           ...(month ? { month } : {})
         })
       });
@@ -76,13 +78,25 @@ export function IngestionForm() {
         </Select>
       </div>
       <div className="space-y-2">
+        <Label>Data mode</Label>
+        <Select value={mode} onValueChange={setMode}>
+          <SelectTrigger className="border-white/10 bg-black/20">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Daily OHLCV</SelectItem>
+            <SelectItem value="auto">Intraday, then daily fallback</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
         <Label htmlFor="month">Historical month</Label>
         <Input id="month" name="month" placeholder="2026-05" className="border-white/10 bg-black/20" />
         <p className="text-xs leading-5 text-muted-foreground">
-          Empty uses the most recent full intraday window. Use YYYY-MM for historical month data.
+          Month is used for intraday mode. Daily OHLCV uses the latest Alpha Vantage compact history.
         </p>
       </div>
-      <div className="flex items-start pt-8">
+      <div className="flex items-start pt-8 md:col-span-2">
         <Button variant="premium" className="w-full" disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
           Fetch Alpha Vantage

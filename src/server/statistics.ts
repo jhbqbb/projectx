@@ -185,6 +185,70 @@ export function deriveTradingDaysFromCandles(candles: CandleInput[], intervalMin
     .sort((a, b) => a.tradingDate.localeCompare(b.tradingDate));
 }
 
+export function deriveTradingDaysFromDailyCandles(candles: CandleInput[]): SessionDay[] {
+  const sorted = [...candles].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  return sorted
+    .slice(1)
+    .map((candle, index) => {
+      const previous = sorted[index];
+      const tradingDate = toZonedTime(candle.timestamp, NY_TIME_ZONE);
+      const dateKey = format(tradingDate, "yyyy-MM-dd");
+      const contextOpen = previous.close;
+      const contextClose = candle.open;
+      const contextHigh = Math.max(contextOpen, contextClose);
+      const contextLow = Math.min(contextOpen, contextClose);
+      const contextMovePct = pctMove(contextOpen, contextClose);
+      const contextRangePct = contextOpen ? (Math.abs(contextClose - contextOpen) / contextOpen) * 100 : null;
+      const regularMovePct = pctMove(candle.open, candle.close);
+      const regularRangePct = candle.open ? ((candle.high - candle.low) / candle.open) * 100 : null;
+      const contextDirection = directionFromMove(contextOpen, contextClose);
+      const regularDirection = directionFromMove(candle.open, candle.close);
+      const regularOpenVsContextHighPct =
+        contextHigh ? ((candle.open - contextHigh) / contextHigh) * 100 : null;
+      const regularOpenVsContextLowPct =
+        contextLow ? ((candle.open - contextLow) / contextLow) * 100 : null;
+      const regularReversedContext =
+        validDirection(contextDirection) &&
+        validDirection(regularDirection) &&
+        contextDirection !== regularDirection;
+
+      return {
+        tradingDate: dateKey,
+        weekday: tradingDate.getDay(),
+        year: tradingDate.getFullYear(),
+        month: tradingDate.getMonth() + 1,
+        contextOpen,
+        contextHigh,
+        contextLow,
+        contextClose,
+        contextMovePct,
+        contextRangePct,
+        contextDirection,
+        contextCandleCount: 1,
+        regularOpen: candle.open,
+        regularHigh: candle.high,
+        regularLow: candle.low,
+        regularClose: candle.close,
+        regularMovePct,
+        regularRangePct,
+        regularDirection,
+        regularCandleCount: 1,
+        regularOpenVsContextHighPct,
+        regularOpenVsContextLowPct,
+        regularBrokeContextHigh: candle.high > contextHigh,
+        regularBrokeContextLow: candle.low < contextLow,
+        regularReversedContext,
+        dataQualityScore: 0.72,
+        openingRangeHigh: null,
+        openingRangeLow: null
+      } satisfies SessionDay & {
+        openingRangeHigh: number | null;
+        openingRangeLow: number | null;
+      };
+    });
+}
+
 function validDirection(direction: Direction) {
   return direction === "BULLISH" || direction === "BEARISH";
 }

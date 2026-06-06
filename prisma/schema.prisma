@@ -29,6 +29,7 @@ enum CandleInterval {
   FIFTEEN_MINUTES
   THIRTY_MINUTES
   SIXTY_MINUTES
+  DAILY
 }
 
 enum Direction {
