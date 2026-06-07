@@ -113,7 +113,7 @@ export async function getBundledResearchSnapshot(): Promise<AnalyticsSnapshot> {
     hasData: true,
     dataset: {
       id: "bundled-nasdaq-qqq-15min",
-      name: "Bundled Nasdaq QQQ 15min Twelve Data OHLCV",
+      name: "Bundled Nasdaq QQQ 15min Twelve Data OHLCV 2Y",
       ticker: "NASDAQ",
       source: "BUNDLED_TWELVE_DATA",
       interval: "FIFTEEN_MINUTES",

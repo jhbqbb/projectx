@@ -9,6 +9,16 @@ import {
 import { deriveOpeningContextTradingDaysFromCandles, deriveTradingDaysFromCandles, type CandleInput } from "@/server/statistics";
 import { fetchTwelveDataIntraday, type TwelveDataInterval } from "@/server/twelve-data";
 
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 export async function ingestAlphaVantageDataset(params: {
   ownerId: string;
   ticker: string;
@@ -337,54 +347,58 @@ export async function createDatasetFromCandles(params: {
   });
 
   await prisma.$transaction([
-    prisma.candle.createMany({
-      data: params.candles.map((candle) => ({
-        datasetId: dataset.id,
-        ticker,
-        timestamp: candle.timestamp,
-        interval: intervalEnum,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-        volume: BigInt(candle.volume ?? 0),
-        source: "CSV_UPLOAD",
-        raw: candle.raw as object
-      })),
-      skipDuplicates: true
-    }),
-    prisma.tradingDay.createMany({
-      data: tradingDays.map((day) => ({
-        datasetId: dataset.id,
-        tradingDate: new Date(`${day.tradingDate}T00:00:00.000Z`),
-        weekday: day.weekday,
-        year: day.year,
-        month: day.month,
-        contextOpen: day.contextOpen,
-        contextHigh: day.contextHigh,
-        contextLow: day.contextLow,
-        contextClose: day.contextClose,
-        contextMovePct: day.contextMovePct,
-        contextRangePct: day.contextRangePct,
-        contextDirection: day.contextDirection,
-        contextCandleCount: day.contextCandleCount,
-        regularOpen: day.regularOpen,
-        regularHigh: day.regularHigh,
-        regularLow: day.regularLow,
-        regularClose: day.regularClose,
-        regularMovePct: day.regularMovePct,
-        regularRangePct: day.regularRangePct,
-        regularDirection: day.regularDirection,
-        regularCandleCount: day.regularCandleCount,
-        regularOpenVsContextHighPct: day.regularOpenVsContextHighPct,
-        regularOpenVsContextLowPct: day.regularOpenVsContextLowPct,
-        regularBrokeContextHigh: day.regularBrokeContextHigh,
-        regularBrokeContextLow: day.regularBrokeContextLow,
-        regularReversedContext: day.regularReversedContext,
-        dataQualityScore: day.dataQualityScore
-      })),
-      skipDuplicates: true
-    }),
+    ...chunkArray(params.candles, 5000).map((chunk) =>
+      prisma.candle.createMany({
+        data: chunk.map((candle) => ({
+          datasetId: dataset.id,
+          ticker,
+          timestamp: candle.timestamp,
+          interval: intervalEnum,
+          open: candle.open,
+          high: candle.high,
+          low: candle.low,
+          close: candle.close,
+          volume: BigInt(candle.volume ?? 0),
+          source: "CSV_UPLOAD",
+          raw: candle.raw as object
+        })),
+        skipDuplicates: true
+      })
+    ),
+    ...chunkArray(tradingDays, 500).map((chunk) =>
+      prisma.tradingDay.createMany({
+        data: chunk.map((day) => ({
+          datasetId: dataset.id,
+          tradingDate: new Date(`${day.tradingDate}T00:00:00.000Z`),
+          weekday: day.weekday,
+          year: day.year,
+          month: day.month,
+          contextOpen: day.contextOpen,
+          contextHigh: day.contextHigh,
+          contextLow: day.contextLow,
+          contextClose: day.contextClose,
+          contextMovePct: day.contextMovePct,
+          contextRangePct: day.contextRangePct,
+          contextDirection: day.contextDirection,
+          contextCandleCount: day.contextCandleCount,
+          regularOpen: day.regularOpen,
+          regularHigh: day.regularHigh,
+          regularLow: day.regularLow,
+          regularClose: day.regularClose,
+          regularMovePct: day.regularMovePct,
+          regularRangePct: day.regularRangePct,
+          regularDirection: day.regularDirection,
+          regularCandleCount: day.regularCandleCount,
+          regularOpenVsContextHighPct: day.regularOpenVsContextHighPct,
+          regularOpenVsContextLowPct: day.regularOpenVsContextLowPct,
+          regularBrokeContextHigh: day.regularBrokeContextHigh,
+          regularBrokeContextLow: day.regularBrokeContextLow,
+          regularReversedContext: day.regularReversedContext,
+          dataQualityScore: day.dataQualityScore
+        })),
+        skipDuplicates: true
+      })
+    ),
     prisma.dataset.update({
       where: { id: dataset.id },
       data: {

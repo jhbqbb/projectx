@@ -11,14 +11,14 @@ const bundledFiles = [
   {
     interval: "1min",
     label: "Nasdaq QQQ 1 minute",
-    name: "NASDAQ QQQ 1min Twelve Data OHLCV",
-    url: "/data/nasdaq-qqq-1min-ohlcv.csv"
+    url: "/data/nasdaq-qqq-1min-ohlcv.csv",
+    rows: "194,282"
   },
   {
     interval: "15min",
     label: "Nasdaq QQQ 15 minute",
-    name: "NASDAQ QQQ 15min Twelve Data OHLCV",
-    url: "/data/nasdaq-qqq-15min-ohlcv.csv"
+    url: "/data/nasdaq-qqq-15min-ohlcv.csv",
+    rows: "12,960"
   }
 ] as const;
 
@@ -80,22 +80,11 @@ export function IngestionForm() {
     setStatus({ tone: "idle", message: "" });
 
     try {
-      const csvResponse = await fetch(file.url);
-
-      if (!csvResponse.ok) {
-        throw new Error(`Unable to fetch ${file.url}.`);
-      }
-
-      const csv = await csvResponse.text();
-      const uploadResponse = await fetch("/api/datasets/upload", {
+      const uploadResponse = await fetch("/api/datasets/ingest-bundled", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ticker: "NASDAQ",
-          name: file.name,
-          interval: file.interval,
-          sessionTemplate: "opening",
-          csv
+          interval: file.interval
         })
       });
       const payload = (await uploadResponse.json()) as {
@@ -184,7 +173,9 @@ export function IngestionForm() {
           {bundledFiles.map((file) => (
             <div key={file.interval} className="rounded-md border border-white/8 bg-white/[0.035] p-3">
               <div className="text-sm font-medium">{file.label}</div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">{file.url}</div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {file.rows} rows · {file.url}
+              </div>
               <div className="mt-3 flex gap-2">
                 <Button
                   type="button"

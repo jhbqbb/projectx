@@ -30,11 +30,11 @@ Alpha Vantage can still be selected when the key has intraday access. Twelve Dat
 
 Real Nasdaq-tracking QQQ OHLCV CSV files are published as static website assets:
 
-- `/data/nasdaq-qqq-1min-ohlcv.csv` - 5,000 one-minute candles from Twelve Data.
-- `/data/nasdaq-qqq-15min-ohlcv.csv` - 5,000 fifteen-minute candles from Twelve Data.
+- `/data/nasdaq-qqq-1min-ohlcv.csv` - 194,282 one-minute QQQ candles from Twelve Data, `2024-06-05` to `2026-06-05`.
+- `/data/nasdaq-qqq-15min-ohlcv.csv` - 12,960 fifteen-minute QQQ candles from Twelve Data, `2024-06-05` to `2026-06-05`.
 - `/data/nasdaq-ohlcv-manifest.json` - file metadata, row counts, and coverage ranges.
 
-In Settings, use the bundled OHLCV ingest buttons to fetch these files and upload them into PostgreSQL. This still requires a working `DATABASE_URL`, because ingested candles and derived session statistics are stored in the database.
+In Settings, use the bundled OHLCV ingest buttons to load these files server-side into PostgreSQL. This still requires a working `DATABASE_URL`, because ingested candles and derived session statistics are stored in the database. When Vercel has no usable database, the AI/reports read the bundled 15-minute file directly for deterministic research answers.
 
 ## Report Modules
 
