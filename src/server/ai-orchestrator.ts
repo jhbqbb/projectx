@@ -27,16 +27,23 @@ export function buildResearchContext(params: {
   ictCalculations?: string[];
 }): ResearchContext {
   const days = params.days ?? [];
+  const ictCalculations = params.ictCalculations ?? [];
   const summary = calculateStatSummary(days);
-  const hasData = days.length > 0 && summary.sampleSize > 0;
-  const sql = hasData ? buildQuestionSql(params.question, params.selectedReports) : "No SQL plan yet. Ingest data first.";
-  const patterns = hasData ? findPatternCandidates(days) : [];
+  const hasSessionData = days.length > 0 && summary.sampleSize > 0;
+  const hasIctData = ictCalculations.length > 0;
+  const hasData = hasSessionData || hasIctData;
+  const sql = hasSessionData
+    ? buildQuestionSql(params.question, params.selectedReports)
+    : hasIctData
+      ? "Bundled ICT sweep maps are calculated directly from static QQQ OHLCV CSV files; no database SQL is required for this view."
+      : "No SQL plan yet. Ingest data first.";
+  const patterns = hasSessionData ? findPatternCandidates(days) : [];
   const strongestExpectancyPatterns = patterns
     .filter((pattern) => pattern.sampleSize > 0)
     .sort((a, b) => b.expectancy - a.expectancy)
     .slice(0, 3);
   const calculations = [
-    ...(hasData
+    ...(hasSessionData
       ? [
           `Sample size: ${summary.sampleSize} valid session days`,
           `Context bullish -> response bearish: ${summary.contextBullishRegularBearish}%`,
@@ -51,7 +58,11 @@ export function buildResearchContext(params: {
               `${pattern.label}: ${pattern.expectancy}% expectancy, ${pattern.averageMove}% average absolute move, ${pattern.sampleSize} samples`
           )
         ]
-      : ["No historical dataset is available yet. Ingest Twelve Data minute candles or upload OHLCV first."])
+      : hasIctData
+        ? [
+            "Session-day database snapshot is not connected; using bundled Twelve Data QQQ OHLCV ICT pattern maps as source of truth."
+          ]
+        : ["No historical dataset is available yet. Ingest Twelve Data minute candles or upload OHLCV first."])
   ];
 
   return {
@@ -60,7 +71,7 @@ export function buildResearchContext(params: {
     summary,
     sql,
     calculations,
-    ictCalculations: params.ictCalculations ?? [],
+    ictCalculations,
     patterns,
     chartSpec: [
       { type: "bar", title: "Directional Probabilities", metric: "probability" },
@@ -76,8 +87,9 @@ export function buildResearchContext(params: {
     ],
     warnings: [
       ...(!hasData ? [params.noDataReason ?? "No historical dataset is available yet."] : []),
-      ...(hasData && summary.sampleSize < 50 ? ["Low sample size: fewer than 50 valid session days."] : []),
-      ...(hasData && summary.confidence < 60 ? ["Confidence below 60: treat as hypothesis, not a trading rule."] : []),
+      ...(hasSessionData && summary.sampleSize < 50 ? ["Low sample size: fewer than 50 valid session days."] : []),
+      ...(hasSessionData && summary.confidence < 60 ? ["Confidence below 60: treat as hypothesis, not a trading rule."] : []),
+      ...(hasIctData ? ["ICT sweep patterns are descriptive historical statistics; validate out of sample before trading."] : []),
       ...patterns
         .filter((pattern) => pattern.sampleSize < 30)
         .map((pattern) => `${pattern.label} has only ${pattern.sampleSize} samples.`)
@@ -97,6 +109,20 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
     ]
       .filter((line, index, lines) => line || lines[index - 1])
       .join("\n");
+  }
+
+  if (context.ictCalculations.length && context.summary.sampleSize === 0) {
+    return [
+      `I analyzed the bundled real Nasdaq QQQ ICT sweep maps for: "${question}".`,
+      "",
+      "Source: Twelve Data QQQ OHLCV CSVs bundled in the website. All timestamps are converted to America/New_York.",
+      "",
+      ...context.ictCalculations.slice(0, 12),
+      "",
+      "Risk flags: these are descriptive historical statistics, not causal rules. Low-n rows and wide confidence intervals should be treated as weak samples.",
+      "",
+      `Follow-ups: ${context.followUps.join(" ")}`
+    ].join("\n");
   }
 
   const strongestExpectancyPatterns = context.patterns
@@ -139,6 +165,7 @@ Do not invent trades, live prices, or causal certainty.
 All times must be written in America/New_York local time.
 Understand ICT-style terminology as research labels only: liquidity sweep, high sweep, low sweep, wick through a prior candle level, close back inside, reversal/fade, continuation/follow-through, displacement, opening range, session timing, and sample-quality risk.
 Answer broadly across trading research topics: sessions, gaps, opens, ranges, sweeps, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
+If ICT sweep map calculations are supplied, answer from those real QQQ OHLCV calculations even when the database session snapshot is unavailable.
 Explain findings in plain English, include sample size, probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.
 If no dataset exists, say "No data available yet" and tell the user to ingest Twelve Data minute candles or upload OHLCV.
 When SQL is shown, keep it read-only and analytical.

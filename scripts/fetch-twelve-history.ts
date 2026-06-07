@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { format, subYears } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
@@ -8,7 +8,7 @@ const PLATFORM_TICKER = "NASDAQ";
 const OUTPUT_SIZE = 5000;
 const REQUEST_DELAY_MS = 8200;
 
-type Interval = "1min" | "15min";
+type Interval = "1min" | "15min" | "1h" | "4h";
 
 type TwelveDataBar = {
   datetime: string;
@@ -43,7 +43,9 @@ type Candle = {
 
 const intervals: Array<{ interval: Interval; minutes: number; file: string }> = [
   { interval: "1min", minutes: 1, file: "public/data/nasdaq-qqq-1min-ohlcv.csv" },
-  { interval: "15min", minutes: 15, file: "public/data/nasdaq-qqq-15min-ohlcv.csv" }
+  { interval: "15min", minutes: 15, file: "public/data/nasdaq-qqq-15min-ohlcv.csv" },
+  { interval: "1h", minutes: 60, file: "public/data/nasdaq-qqq-1h-ohlcv.csv" },
+  { interval: "4h", minutes: 240, file: "public/data/nasdaq-qqq-4h-ohlcv.csv" }
 ];
 
 function requireApiKey() {
@@ -183,9 +185,21 @@ async function fetchInterval(apiKey: string, interval: Interval, minutes: number
 
 async function main() {
   const apiKey = requireApiKey();
-  const manifestFiles = [];
+  const requestedIntervals = (process.env.ONLY_INTERVALS ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const activeIntervals = requestedIntervals.length
+    ? intervals.filter((item) => requestedIntervals.includes(item.interval))
+    : intervals;
+  const existingManifest = await readFile("public/data/nasdaq-ohlcv-manifest.json", "utf8")
+    .then((value) => JSON.parse(value) as { files?: Array<{ interval: string }> })
+    .catch(() => ({ files: [] }));
+  const manifestFiles = new Map<string, unknown>(
+    existingManifest.files?.map((file) => [file.interval, file]) ?? []
+  );
 
-  for (const item of intervals) {
+  for (const item of activeIntervals) {
     const result = await fetchInterval(apiKey, item.interval, item.minutes);
 
     if (!result.candles.length) {
@@ -197,7 +211,7 @@ async function main() {
     const first = result.candles[0];
     const last = result.candles[result.candles.length - 1];
 
-    manifestFiles.push({
+    manifestFiles.set(item.interval, {
       interval: item.interval,
       url: item.file.replace("public", "").replaceAll("\\", "/"),
       rows: result.candles.length,
@@ -227,7 +241,9 @@ async function main() {
         providerMicCode: "XNMS",
         timestampFormat: "ISO-8601 UTC",
         columns: ["timestamp", "open", "high", "low", "close", "volume"],
-        files: manifestFiles
+        files: intervals
+          .map((item) => manifestFiles.get(item.interval))
+          .filter(Boolean)
       },
       null,
       2

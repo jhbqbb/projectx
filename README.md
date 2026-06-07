@@ -22,7 +22,7 @@ The dashboard, reports, pattern explorer, session analyzer, and AI source panel 
 
 ## Important Data Note
 
-The platform is configured for minute-candle research. Twelve Data is the default provider for `1min` and `15min` OHLCV data. Alpha Vantage can still be selected when the key has intraday access, and minute OHLCV CSV uploads are also supported. Daily candles are not used for dashboard, report, pattern, or AI research statistics. When Twelve Data pre/post-market access is not available, the engine uses 09:30-09:59 ET as opening context and 10:00-15:59 ET as the response session.
+The platform is configured for intraday research. Twelve Data is the default provider for `1min`, `15min`, `1h`, and `4h` OHLCV data. Alpha Vantage can still be selected when the key has intraday access, and OHLCV CSV uploads are also supported. Daily candles are not used for dashboard, report, pattern, or AI research statistics. When Twelve Data pre/post-market access is not available, the engine uses 09:30-09:59 ET as opening context and 10:00-15:59 ET as the response session.
 
 Alpha Vantage can still be selected when the key has intraday access. Twelve Data pre/post-market data requires a paid provider plan; without that plan, ProjectX uses regular-session minute candles only.
 
@@ -32,9 +32,11 @@ Real Nasdaq-tracking QQQ OHLCV CSV files are published as static website assets:
 
 - `/data/nasdaq-qqq-1min-ohlcv.csv` - 194,282 one-minute QQQ candles from Twelve Data, `2024-06-05` to `2026-06-05`.
 - `/data/nasdaq-qqq-15min-ohlcv.csv` - 12,960 fifteen-minute QQQ candles from Twelve Data, `2024-06-05` to `2026-06-05`.
+- `/data/nasdaq-qqq-1h-ohlcv.csv` - 3,492 one-hour QQQ candles from Twelve Data, `2024-06-05` to `2026-06-05`.
+- `/data/nasdaq-qqq-4h-ohlcv.csv` - 999 four-hour QQQ candles from Twelve Data, `2024-06-05` to `2026-06-05`.
 - `/data/nasdaq-ohlcv-manifest.json` - file metadata, row counts, and coverage ranges.
 
-In Settings, use the bundled OHLCV ingest buttons to load these files server-side into PostgreSQL. This still requires a working `DATABASE_URL`, because ingested candles and derived session statistics are stored in the database. When Vercel has no usable database, the AI/reports read the bundled 15-minute file directly for deterministic research answers.
+In Settings, use the bundled OHLCV ingest buttons to load the supported minute files server-side into PostgreSQL. This still requires a working `DATABASE_URL`, because ingested candles and derived session statistics are stored in the database. When Vercel has no usable database, the AI and ICT pattern terminal read the bundled 15M, 1H, and 4H files directly for deterministic research answers.
 
 ## Report Modules
 
@@ -119,4 +121,4 @@ npm run build
 
 ## OpenAI Integration
 
-The AI layer uses the Responses API for new AI workflows and streaming. The default model is `gpt-5-mini` for a cost-balanced research chat experience, with low reasoning effort, low verbosity, and a max output token cap. It keeps database execution server-side, only allows read-only SQL against approved analytics tables, and always pairs model commentary with deterministic statistical calculations.
+The AI layer uses the Responses API for new AI workflows and streaming. The default model is `gpt-5-mini` for a cost-balanced research chat experience, with medium reasoning effort, medium verbosity, and a max output token cap. It keeps database execution server-side, only allows read-only SQL against approved analytics tables, and always pairs model commentary with deterministic statistical calculations.

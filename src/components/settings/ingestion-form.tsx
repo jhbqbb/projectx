@@ -12,13 +12,33 @@ const bundledFiles = [
     interval: "1min",
     label: "Nasdaq QQQ 1 minute",
     url: "/data/nasdaq-qqq-1min-ohlcv.csv",
-    rows: "194,282"
+    rows: "194,282",
+    coverage: "2024-06-05 to 2026-06-05",
+    ingestInterval: "1min"
   },
   {
     interval: "15min",
     label: "Nasdaq QQQ 15 minute",
     url: "/data/nasdaq-qqq-15min-ohlcv.csv",
-    rows: "12,960"
+    rows: "12,960",
+    coverage: "2024-06-05 to 2026-06-05",
+    ingestInterval: "15min"
+  },
+  {
+    interval: "1h",
+    label: "Nasdaq QQQ 1 hour",
+    url: "/data/nasdaq-qqq-1h-ohlcv.csv",
+    rows: "3,492",
+    coverage: "2024-06-05 to 2026-06-05",
+    ingestInterval: null
+  },
+  {
+    interval: "4h",
+    label: "Nasdaq QQQ 4 hour",
+    url: "/data/nasdaq-qqq-4h-ohlcv.csv",
+    rows: "999",
+    coverage: "2024-06-05 to 2026-06-05",
+    ingestInterval: null
   }
 ] as const;
 
@@ -76,6 +96,10 @@ export function IngestionForm() {
   }
 
   async function ingestBundled(file: (typeof bundledFiles)[number]) {
+    if (!file.ingestInterval) {
+      return;
+    }
+
     setBundledLoading(file.interval);
     setStatus({ tone: "idle", message: "" });
 
@@ -84,7 +108,7 @@ export function IngestionForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          interval: file.interval
+          interval: file.ingestInterval
         })
       });
       const payload = (await uploadResponse.json()) as {
@@ -167,26 +191,31 @@ export function IngestionForm() {
       <div className="md:col-span-2 rounded-md border border-white/10 bg-black/20 p-3">
         <div className="text-sm font-medium">Bundled real OHLCV files</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">
-          Static Twelve Data QQQ files are available without provider env vars. Use these when you want to ingest from CSV.
+          Static Twelve Data QQQ files are available without provider env vars. Pattern Explorer and AI read the 15M, 1H, and 4H files directly; PostgreSQL session ingestion supports the 1M and 15M files.
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {bundledFiles.map((file) => (
             <div key={file.interval} className="rounded-md border border-white/8 bg-white/[0.035] p-3">
               <div className="text-sm font-medium">{file.label}</div>
               <div className="mt-1 truncate text-xs text-muted-foreground">
-                {file.rows} rows · {file.url}
+                {file.rows} rows - {file.coverage}
+              </div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {file.url}
               </div>
               <div className="mt-3 flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => ingestBundled(file)}
-                  disabled={Boolean(bundledLoading)}
-                >
-                  {bundledLoading === file.interval ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
-                  Ingest
-                </Button>
+                {file.ingestInterval ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => ingestBundled(file)}
+                    disabled={Boolean(bundledLoading)}
+                  >
+                    {bundledLoading === file.interval ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
+                    Ingest
+                  </Button>
+                ) : null}
                 <Button type="button" variant="ghost" size="sm" asChild>
                   <a href={file.url} download>
                     <FileDown className="size-4" />

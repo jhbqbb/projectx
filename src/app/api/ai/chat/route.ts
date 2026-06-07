@@ -39,17 +39,20 @@ async function writeText(controller: ReadableStreamDefaultController<Uint8Array>
 
 async function getIctCalculations() {
   try {
-    const map = await getIctPatternMap({ mode: "reversal", minN: 10, minEdge: 50 });
-    const topRows = map.rows.slice(0, 6);
-
-    return [
-      `ICT sweep map dataset: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} -> ${map.meta.to}, ${map.meta.tradingDays} trading days, ${map.meta.totalCandles} 15-minute candles, all times America/New_York.`,
-      `Visible reversal patterns: ${map.summary.patterns}; sweep events: ${map.summary.sweepEvents}; sample-weighted reversal edge: ${map.summary.weightedEdge}%.`,
-      ...topRows.map(
-        (row) =>
-          `${row.day} ${row.target} -> ${row.sweep} ${row.direction.toLowerCase()} sweep: ${row.edge}% ${map.meta.mode}, CI [${row.ciLow}-${row.ciHigh}], n=${row.n}/${row.opportunities}, depth ${row.depth} pts, rejection ${row.rejection} pts, trade ${row.trade}.`
+    const maps = await Promise.all(
+      (["15min", "1h", "4h"] as const).map((interval) =>
+        getIctPatternMap({ interval, mode: "reversal", minN: interval === "4h" ? 3 : 10, minEdge: 50 })
       )
-    ];
+    );
+
+    return maps.flatMap((map) => [
+      `ICT ${map.meta.intervalLabel} dataset: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} -> ${map.meta.to}, ${map.meta.tradingDays} trading days, ${map.meta.totalCandles} candles, all times America/New_York.`,
+      `ICT ${map.meta.intervalLabel} reversal map: ${map.summary.patterns} visible patterns; ${map.summary.sweepEvents} sweep events; sample-weighted edge ${map.summary.weightedEdge}%.`,
+      ...map.rows.slice(0, 3).map(
+        (row) =>
+          `${map.meta.intervalLabel} ${row.day} ${row.target} -> ${row.sweep} ${row.direction.toLowerCase()} sweep: ${row.edge}% ${map.meta.mode}, CI [${row.ciLow}-${row.ciHigh}], n=${row.n}/${row.opportunities}, depth ${row.depth} pts, rejection ${row.rejection} pts, trade ${row.trade}.`
+      )
+    ]);
   } catch {
     return [];
   }

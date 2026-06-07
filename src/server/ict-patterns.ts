@@ -29,9 +29,11 @@ type IctCandle = {
 
 type SweepDirection = "HIGH" | "LOW";
 type PatternMode = "reversal" | "continuation";
+type IctInterval = "15min" | "1h" | "4h";
 
 export type IctPatternFilters = {
   mode?: PatternMode;
+  interval?: IctInterval;
   day?: string;
   direction?: "BOTH" | SweepDirection;
   minN?: number;
@@ -92,9 +94,14 @@ type CachedCandles = {
   to: string;
 };
 
-let cachedCandles: CachedCandles | null = null;
+const cachedCandles = new Map<IctInterval, CachedCandles>();
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const intervalMeta: Record<IctInterval, { label: string; file: string; responseCandles: number }> = {
+  "15min": { label: "15M", file: "nasdaq-qqq-15min-ohlcv.csv", responseCandles: 0 },
+  "1h": { label: "1H", file: "nasdaq-qqq-1h-ohlcv.csv", responseCandles: 2 },
+  "4h": { label: "4H", file: "nasdaq-qqq-4h-ohlcv.csv", responseCandles: 1 }
+};
 
 function round(value: number, digits = 1) {
   return Number(value.toFixed(digits));
@@ -159,22 +166,25 @@ function parseCandles(csv: string): IctCandle[] {
     .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 }
 
-async function loadCandles() {
-  if (cachedCandles) {
-    return cachedCandles;
+async function loadCandles(interval: IctInterval) {
+  const cached = cachedCandles.get(interval);
+
+  if (cached) {
+    return cached;
   }
 
-  const csvPath = path.join(process.cwd(), "public", "data", "nasdaq-qqq-15min-ohlcv.csv");
+  const csvPath = path.join(process.cwd(), "public", "data", intervalMeta[interval].file);
   const csv = await readFile(csvPath, "utf8");
   const candles = parseCandles(csv);
 
-  cachedCandles = {
+  const result = {
     candles,
     from: candles[0]?.nyDate ?? "",
     to: candles[candles.length - 1]?.nyDate ?? ""
   };
+  cachedCandles.set(interval, result);
 
-  return cachedCandles;
+  return result;
 }
 
 function groupByDate(candles: IctCandle[]) {
@@ -228,19 +238,35 @@ function toRow(accumulator: PatternAccumulator, mode: PatternMode): IctPatternRo
   };
 }
 
+function responseCloseFor(candles: IctCandle[], dayCandles: IctCandle[], sweep: IctCandle, sweepIndex: number, interval: IctInterval) {
+  if (interval === "15min") {
+    const response = dayCandles.slice(sweepIndex + 1);
+    return response[response.length - 1]?.close ?? null;
+  }
+
+  const globalIndex = candles.findIndex((candle) => candle.timestamp.getTime() === sweep.timestamp.getTime());
+  const responseIndex = globalIndex + intervalMeta[interval].responseCandles;
+
+  return globalIndex >= 0 ? candles[responseIndex]?.close ?? null : null;
+}
+
 function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilters>) {
   const accumulators = new Map<string, PatternAccumulator>();
+  const minDayCandles = filters.interval === "4h" ? 2 : 3;
 
   for (const day of groupByDate(candles)) {
-    for (let targetIndex = 0; targetIndex < day.candles.length - 2; targetIndex += 1) {
+    if (day.candles.length < minDayCandles) {
+      continue;
+    }
+
+    for (let targetIndex = 0; targetIndex < day.candles.length - 1; targetIndex += 1) {
       const target = day.candles[targetIndex];
 
-      for (let sweepIndex = targetIndex + 1; sweepIndex < day.candles.length - 1; sweepIndex += 1) {
+      for (let sweepIndex = targetIndex + 1; sweepIndex < day.candles.length; sweepIndex += 1) {
         const sweep = day.candles[sweepIndex];
-        const response = day.candles.slice(sweepIndex + 1);
-        const responseClose = response[response.length - 1]?.close;
+        const responseClose = responseCloseFor(candles, day.candles, sweep, sweepIndex, filters.interval);
 
-        if (!response.length || !responseClose) {
+        if (!responseClose) {
           continue;
         }
 
@@ -352,13 +378,19 @@ function applyDateRange(candles: IctCandle[], from: string, to: string) {
   return candles.filter((candle) => candle.nyDate >= from && candle.nyDate <= to);
 }
 
+function normalizeInterval(interval?: string): IctInterval {
+  return interval === "1h" || interval === "4h" ? interval : "15min";
+}
+
 function normalizeFilters(filters: IctPatternFilters, defaults: { from: string; to: string }): Required<IctPatternFilters> {
   const mode = filters.mode === "continuation" ? "continuation" : "reversal";
   const direction = filters.direction === "HIGH" || filters.direction === "LOW" ? filters.direction : "BOTH";
   const day = filters.day?.toUpperCase() ?? "ALL";
+  const interval = normalizeInterval(filters.interval);
 
   return {
     mode,
+    interval,
     direction,
     day: ["ALL", "MON", "TUE", "WED", "THU", "FRI"].includes(day) ? day : "ALL",
     minN: Math.max(1, Number(filters.minN ?? 10)),
@@ -370,7 +402,8 @@ function normalizeFilters(filters: IctPatternFilters, defaults: { from: string; 
 }
 
 export async function getIctPatternMap(filters: IctPatternFilters = {}) {
-  const loaded = await loadCandles();
+  const interval = normalizeInterval(filters.interval);
+  const loaded = await loadCandles(interval);
   const normalized = normalizeFilters(filters, { from: loaded.from, to: loaded.to });
   const rangedCandles = applyDateRange(loaded.candles, normalized.from, normalized.to);
   const rows = buildPatternRows(rangedCandles, normalized);
@@ -382,9 +415,11 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
 
   return {
     meta: {
-      title: "PROJECTX QQQ 15M ICT Pattern Map",
-      subtitle: "2Y Nasdaq QQQ sweep map - New York local time",
+      title: `PROJECTX QQQ ${intervalMeta[normalized.interval].label} ICT Pattern Map`,
+      subtitle: `2Y Nasdaq QQQ ${intervalMeta[normalized.interval].label} sweep map - New York local time`,
       timezone: NY_TIME_ZONE,
+      interval: normalized.interval,
+      intervalLabel: intervalMeta[normalized.interval].label,
       mode: normalized.mode,
       from: normalized.from,
       to: normalized.to,
