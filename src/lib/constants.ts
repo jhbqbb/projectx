@@ -113,6 +113,7 @@ export const NAV_ITEMS = [
 ] as const;
 
 export const DATASET_SOURCES = [
+  { id: "twelve-data", label: "Twelve Data", icon: Database },
   { id: "alpha-vantage", label: "Alpha Vantage", icon: Database },
   { id: "csv-upload", label: "CSV Upload", icon: LineChart }
 ] as const;

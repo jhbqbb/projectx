@@ -20,11 +20,44 @@ type SessionBucket = {
   openingRange: CandleInput[];
 };
 
+type SessionWindowConfig = {
+  contextStart: number;
+  contextEnd: number;
+  regularStart: number;
+  regularEnd: number;
+  openingRangeStart: number;
+  openingRangeEnd: number;
+  expectedContextMinutes: number;
+  expectedRegularMinutes: number;
+};
+
 const CONTEXT_START_MINUTE = 4 * 60;
 const CONTEXT_END_MINUTE = 9 * 60 + 25;
 const NY_START_MINUTE = 9 * 60 + 30;
 const NY_END_MINUTE = 16 * 60;
 const OPENING_RANGE_END_MINUTE = 10 * 60;
+
+const PREMARKET_CONTEXT_WINDOWS: SessionWindowConfig = {
+  contextStart: CONTEXT_START_MINUTE,
+  contextEnd: CONTEXT_END_MINUTE,
+  regularStart: NY_START_MINUTE,
+  regularEnd: NY_END_MINUTE,
+  openingRangeStart: NY_START_MINUTE,
+  openingRangeEnd: OPENING_RANGE_END_MINUTE,
+  expectedContextMinutes: 5.42 * 60,
+  expectedRegularMinutes: 6.5 * 60
+};
+
+const OPENING_CONTEXT_WINDOWS: SessionWindowConfig = {
+  contextStart: NY_START_MINUTE,
+  contextEnd: OPENING_RANGE_END_MINUTE - 1,
+  regularStart: OPENING_RANGE_END_MINUTE,
+  regularEnd: NY_END_MINUTE - 1,
+  openingRangeStart: NY_START_MINUTE,
+  openingRangeEnd: OPENING_RANGE_END_MINUTE,
+  expectedContextMinutes: 30,
+  expectedRegularMinutes: 6 * 60
+};
 
 export function directionFromMove(open: number | null, close: number | null): Direction {
   if (open === null || close === null || open === 0) {
@@ -92,14 +125,18 @@ function summarizeCandles(candles: CandleInput[]) {
   };
 }
 
-export function deriveTradingDaysFromCandles(candles: CandleInput[], intervalMinutes = 5): SessionDay[] {
+export function deriveTradingDaysFromCandles(
+  candles: CandleInput[],
+  intervalMinutes = 5,
+  windows = PREMARKET_CONTEXT_WINDOWS
+): SessionDay[] {
   const buckets = new Map<string, SessionBucket>();
 
   for (const candle of candles) {
     const minute = minutesInNewYork(candle.timestamp);
-    const isContext = minute >= CONTEXT_START_MINUTE && minute <= CONTEXT_END_MINUTE;
-    const isRegular = minute >= NY_START_MINUTE && minute <= NY_END_MINUTE;
-    const isOpeningRange = minute >= NY_START_MINUTE && minute < OPENING_RANGE_END_MINUTE;
+    const isContext = minute >= windows.contextStart && minute <= windows.contextEnd;
+    const isRegular = minute >= windows.regularStart && minute <= windows.regularEnd;
+    const isOpeningRange = minute >= windows.openingRangeStart && minute < windows.openingRangeEnd;
 
     if (!isContext && !isRegular) {
       continue;
@@ -129,8 +166,8 @@ export function deriveTradingDaysFromCandles(candles: CandleInput[], intervalMin
       const regular = summarizeCandles(bucket.regular);
       const openingRange = summarizeCandles(bucket.openingRange);
       const tradingDate = toTradingDateDate(dateKey);
-      const expectedContext = Math.round((5.42 * 60) / intervalMinutes);
-      const expectedRegular = Math.round((6.5 * 60) / intervalMinutes) + 1;
+      const expectedContext = Math.round(windows.expectedContextMinutes / intervalMinutes);
+      const expectedRegular = Math.round(windows.expectedRegularMinutes / intervalMinutes);
       const contextCoverage = context ? clamp(context.count / expectedContext, 0, 1) : 0;
       const regularCoverage = regular ? clamp(regular.count / expectedRegular, 0, 1) : 0;
       const dataQualityScore = Number(((contextCoverage + regularCoverage) / 2).toFixed(3));
@@ -183,6 +220,10 @@ export function deriveTradingDaysFromCandles(candles: CandleInput[], intervalMin
       };
     })
     .sort((a, b) => a.tradingDate.localeCompare(b.tradingDate));
+}
+
+export function deriveOpeningContextTradingDaysFromCandles(candles: CandleInput[], intervalMinutes = 15) {
+  return deriveTradingDaysFromCandles(candles, intervalMinutes, OPENING_CONTEXT_WINDOWS);
 }
 
 function validDirection(direction: Direction) {

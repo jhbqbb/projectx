@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export function IngestionForm() {
   const [interval, setIntervalValue] = useState("15min");
+  const [provider, setProvider] = useState("twelve-data");
   const [status, setStatus] = useState<{ tone: "success" | "error" | "idle"; message: string }>({
     tone: "idle",
     message: ""
@@ -31,6 +32,7 @@ export function IngestionForm() {
         body: JSON.stringify({
           ticker,
           interval,
+          provider,
           ...(month ? { month } : {})
         })
       });
@@ -61,6 +63,26 @@ export function IngestionForm() {
         <Input id="ticker" name="ticker" defaultValue="QQQ" className="border-white/10 bg-black/20" />
       </div>
       <div className="space-y-2">
+        <Label>Provider</Label>
+        <Select
+          value={provider}
+          onValueChange={(value) => {
+            setProvider(value);
+            if (value === "twelve-data" && interval === "60min") {
+              setIntervalValue("15min");
+            }
+          }}
+        >
+          <SelectTrigger className="border-white/10 bg-black/20">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="twelve-data">Twelve Data</SelectItem>
+            <SelectItem value="alpha-vantage">Alpha Vantage</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
         <Label>Interval</Label>
         <Select value={interval} onValueChange={setIntervalValue}>
           <SelectTrigger className="border-white/10 bg-black/20">
@@ -71,7 +93,7 @@ export function IngestionForm() {
             <SelectItem value="5min">5 minute</SelectItem>
             <SelectItem value="15min">15 minute</SelectItem>
             <SelectItem value="30min">30 minute</SelectItem>
-            <SelectItem value="60min">60 minute</SelectItem>
+            {provider === "alpha-vantage" ? <SelectItem value="60min">60 minute</SelectItem> : null}
           </SelectContent>
         </Select>
       </div>
@@ -79,13 +101,13 @@ export function IngestionForm() {
         <Label htmlFor="month">Historical month</Label>
         <Input id="month" name="month" placeholder="2026-05" className="border-white/10 bg-black/20" />
         <p className="text-xs leading-5 text-muted-foreground">
-          Minute-candle Alpha Vantage requests require intraday access. Use 1 minute or 15 minute when the key supports it.
+          Twelve Data is the default minute-candle source. Alpha Vantage month is only used when that provider is selected.
         </p>
       </div>
       <div className="flex items-start pt-8">
         <Button variant="premium" className="w-full" disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
-          Fetch Alpha Vantage
+          Fetch market data
         </Button>
       </div>
       {status.message ? (

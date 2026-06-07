@@ -186,10 +186,14 @@ export async function getAnalyticsSnapshot(params: { ownerId?: string | null; da
     }
 
     const patterns = findPatternCandidates(sessions);
+    const providerWarning =
+      dataset.source === "TWELVE_DATA"
+        ? "Twelve Data minute candles are normalized to America/New_York. This dataset uses 09:30-09:59 opening context and 10:00-15:59 response because pre/post-market data requires a Twelve Data Pro plan."
+        : "Alpha Vantage US equity intraday extended-hours coverage is 4:00am to 8:00pm ET; overnight futures-style sessions need a different data source.";
     const warnings = [
       ...(summary.sampleSize < 250 ? ["Sample size is modest. Treat this as descriptive research, not proof of an edge."] : []),
       ...(summary.confidence < 60 ? ["Confidence is below 60. Validate on a larger holdout period."] : []),
-      "Alpha Vantage US equity intraday extended-hours coverage is 4:00am to 8:00pm ET; overnight futures-style sessions need a different data source."
+      providerWarning
     ];
 
     return {

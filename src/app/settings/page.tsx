@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 export default function SettingsPage() {
   const env = {
     database: Boolean(process.env.DATABASE_URL),
+    twelve: Boolean(process.env.TWELVE_DATA_API_KEY),
     alpha: Boolean(process.env.ALPHA_VANTAGE_API_KEY),
     openai: Boolean(process.env.OPENAI_API_KEY)
   };
@@ -62,6 +63,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-3">
             {[
               ["PostgreSQL", env.database],
+              ["Twelve Data", env.twelve],
               ["Alpha Vantage", env.alpha],
               ["OpenAI", env.openai]
             ].map(([label, ready]) => (

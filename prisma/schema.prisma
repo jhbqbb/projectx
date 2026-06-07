@@ -14,6 +14,7 @@ enum UserRole {
 
 enum DatasetSource {
   ALPHA_VANTAGE
+  TWELVE_DATA
   CSV_UPLOAD
 }
 

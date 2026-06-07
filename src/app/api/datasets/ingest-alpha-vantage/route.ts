@@ -3,12 +3,14 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ingestAlphaVantageDataset } from "@/server/ingestion";
+import { ingestAlphaVantageDataset, ingestTwelveDataDataset } from "@/server/ingestion";
+import type { TwelveDataInterval } from "@/server/twelve-data";
 
 const ingestSchema = z.object({
   ticker: z.string().min(1).max(12).default("QQQ"),
   interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).default("15min"),
-  month: z.string().regex(/^\d{4}-\d{2}$/).optional()
+  month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  provider: z.enum(["twelve-data", "alpha-vantage"]).default("twelve-data")
 });
 
 async function getIngestionOwner(request: NextRequest) {
@@ -40,12 +42,24 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getIngestionOwner(request);
     const body = ingestSchema.parse(await request.json());
-    const dataset = await ingestAlphaVantageDataset({
-      ownerId: user.id,
-      ticker: body.ticker,
-      interval: body.interval,
-      month: body.month
-    });
+
+    if (body.provider === "twelve-data" && body.interval === "60min") {
+      throw new Error("Twelve Data ingestion supports 1min, 5min, 15min, or 30min. Use 15min for session research.");
+    }
+
+    const dataset =
+      body.provider === "twelve-data"
+        ? await ingestTwelveDataDataset({
+            ownerId: user.id,
+            ticker: body.ticker,
+            interval: body.interval as TwelveDataInterval
+          })
+        : await ingestAlphaVantageDataset({
+            ownerId: user.id,
+            ticker: body.ticker,
+            interval: body.interval,
+            month: body.month
+          });
 
     return NextResponse.json({ dataset });
   } catch (error) {

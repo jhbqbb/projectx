@@ -24,7 +24,7 @@ The dashboard, reports, pattern explorer, session analyzer, and AI source panel 
 
 Alpha Vantage's US equity intraday endpoint supports extended-hours bars from 4:00am to 8:00pm Eastern Time. Because that feed does not cover the full overnight futures-style window, the built-in session engine uses a covered context session of 04:00 -> 09:25 ET and regular session from 09:30 ET. Use uploaded futures/CFD/index data when a complete overnight session is required.
 
-The platform is configured for minute-candle research. Use Alpha Vantage intraday access for `1min` or `15min` data, or upload a minute OHLCV CSV. Daily candles are not used for dashboard, report, pattern, or AI research statistics.
+The platform is configured for minute-candle research. Twelve Data is the default provider for `1min` and `15min` OHLCV data. Alpha Vantage can still be selected when the key has intraday access, and minute OHLCV CSV uploads are also supported. Daily candles are not used for dashboard, report, pattern, or AI research statistics. When Twelve Data pre/post-market access is not available, the engine uses 09:30-09:59 ET as opening context and 10:00-15:59 ET as the response session.
 
 ## Report Modules
 
@@ -85,6 +85,7 @@ Set these environment variables in Vercel:
 
 - `DATABASE_URL`
 - `JWT_SECRET`
+- `TWELVE_DATA_API_KEY`
 - `ALPHA_VANTAGE_API_KEY`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
