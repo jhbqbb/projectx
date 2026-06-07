@@ -1,6 +1,6 @@
 import { fromZonedTime } from "date-fns-tz";
 import { NY_TIME_ZONE } from "@/lib/constants";
-import { normalizeNasdaqTicker, type AlphaVantageInterval } from "@/server/alpha-vantage";
+import { resolveNasdaqProviderSymbol, type AlphaVantageInterval } from "@/server/alpha-vantage";
 import type { CandleInput } from "@/server/statistics";
 
 type TwelveDataBar = {
@@ -38,7 +38,7 @@ export async function fetchTwelveDataIntraday(params: {
     throw new Error("TWELVE_DATA_API_KEY is not configured.");
   }
 
-  const ticker = normalizeNasdaqTicker(params.ticker);
+  const ticker = resolveNasdaqProviderSymbol(params.ticker);
   const interval = params.interval ?? "15min";
   const query = new URLSearchParams({
     symbol: ticker,

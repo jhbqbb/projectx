@@ -7,7 +7,7 @@ import { ingestAlphaVantageDataset, ingestTwelveDataDataset } from "@/server/ing
 import type { TwelveDataInterval } from "@/server/twelve-data";
 
 const ingestSchema = z.object({
-  ticker: z.string().min(1).max(12).default("QQQ"),
+  ticker: z.string().min(1).max(12).default("NASDAQ"),
   interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).default("15min"),
   month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   provider: z.enum(["twelve-data", "alpha-vantage"]).default("twelve-data")

@@ -77,7 +77,7 @@ npm run prisma:migrate
 npm run dev
 ```
 
-Then open Settings and fetch Alpha Vantage data. The default ticker is `QQQ`; use the month field (`YYYY-MM`) to request historical intraday months.
+Then open Settings and fetch market data. The default market is `NASDAQ`; the app keeps `NASDAQ` as the platform ticker and stores any provider-specific symbol in dataset metadata.
 
 ## Vercel Deployment
 

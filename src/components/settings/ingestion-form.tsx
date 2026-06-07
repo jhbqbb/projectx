@@ -22,7 +22,7 @@ export function IngestionForm() {
     setStatus({ tone: "idle", message: "" });
 
     const form = new FormData(event.currentTarget);
-    const ticker = String(form.get("ticker") || "QQQ");
+    const ticker = String(form.get("ticker") || "NASDAQ");
     const month = String(form.get("month") || "").trim();
 
     try {
@@ -36,7 +36,10 @@ export function IngestionForm() {
           ...(month ? { month } : {})
         })
       });
-      const payload = (await response.json()) as { error?: string; dataset?: { tradingDayCount: number; candleCount: number; name: string } };
+      const payload = (await response.json()) as {
+        error?: string;
+        dataset?: { tradingDayCount: number; candleCount: number; name: string; ticker: string };
+      };
 
       if (!response.ok || payload.error) {
         throw new Error(payload.error ?? "Alpha Vantage ingestion failed.");
@@ -59,8 +62,8 @@ export function IngestionForm() {
   return (
     <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
       <div className="space-y-2">
-        <Label htmlFor="ticker">Ticker</Label>
-        <Input id="ticker" name="ticker" defaultValue="QQQ" className="border-white/10 bg-black/20" />
+        <Label htmlFor="ticker">Market</Label>
+        <Input id="ticker" name="ticker" defaultValue="NASDAQ" className="border-white/10 bg-black/20" />
       </div>
       <div className="space-y-2">
         <Label>Provider</Label>

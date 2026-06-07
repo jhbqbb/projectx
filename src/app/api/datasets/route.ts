@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 const datasetSchema = z.object({
   name: z.string().min(1).max(120),
-  ticker: z.string().min(1).max(12).default("QQQ")
+  ticker: z.string().min(1).max(12).default("NASDAQ")
 });
 
 export async function GET(request: NextRequest) {

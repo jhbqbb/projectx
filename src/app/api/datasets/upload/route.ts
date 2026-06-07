@@ -6,7 +6,7 @@ import { createDatasetFromCandles } from "@/server/ingestion";
 import type { CandleInput } from "@/server/statistics";
 
 const uploadSchema = z.object({
-  ticker: z.string().min(1).max(12).default("QQQ"),
+  ticker: z.string().min(1).max(12).default("NASDAQ"),
   name: z.string().min(1).max(120).default("Uploaded Nasdaq dataset"),
   interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).default("5min"),
   csv: z.string().min(10)

@@ -3,6 +3,7 @@ import {
   fetchAlphaVantageIntraday,
   intervalToPrisma,
   normalizeNasdaqTicker,
+  resolveNasdaqProviderSymbol,
   type AlphaVantageInterval
 } from "@/server/alpha-vantage";
 import { deriveOpeningContextTradingDaysFromCandles, deriveTradingDaysFromCandles, type CandleInput } from "@/server/statistics";
@@ -15,6 +16,7 @@ export async function ingestAlphaVantageDataset(params: {
   month?: string;
 }) {
   const ticker = normalizeNasdaqTicker(params.ticker);
+  const providerSymbol = resolveNasdaqProviderSymbol(ticker);
   const interval = params.interval ?? "15min";
   const intervalEnum = intervalToPrisma[interval];
   const job = await prisma.ingestionJob.create({
@@ -22,7 +24,7 @@ export async function ingestAlphaVantageDataset(params: {
       source: "ALPHA_VANTAGE",
       ticker,
       interval: intervalEnum,
-      metadata: { month: params.month ?? null }
+      metadata: { month: params.month ?? null, providerSymbol }
     }
   });
 
@@ -31,7 +33,7 @@ export async function ingestAlphaVantageDataset(params: {
 
     try {
       candles = await fetchAlphaVantageIntraday({
-        ticker,
+        ticker: providerSymbol,
         interval,
         month: params.month
       });
@@ -62,6 +64,7 @@ export async function ingestAlphaVantageDataset(params: {
         metadata: {
           alphaVantageMonth: params.month ?? null,
           alphaVantageMode: "intraday",
+          providerSymbol,
           sessionDefinition: {
             context: "04:00-09:25 America/New_York",
             regular: "09:30-16:00 America/New_York",
@@ -164,6 +167,7 @@ export async function ingestTwelveDataDataset(params: {
   interval?: TwelveDataInterval;
 }) {
   const ticker = normalizeNasdaqTicker(params.ticker);
+  const providerSymbol = resolveNasdaqProviderSymbol(ticker);
   const interval = params.interval ?? "15min";
   const intervalEnum = intervalToPrisma[interval];
   const job = await prisma.ingestionJob.create({
@@ -171,13 +175,13 @@ export async function ingestTwelveDataDataset(params: {
       source: "TWELVE_DATA",
       ticker,
       interval: intervalEnum,
-      metadata: { provider: "twelve-data" }
+      metadata: { provider: "twelve-data", providerSymbol }
     }
   });
 
   try {
     const candles = await fetchTwelveDataIntraday({
-      ticker,
+      ticker: providerSymbol,
       interval
     });
     const tradingDays = deriveOpeningContextTradingDaysFromCandles(candles, Number(interval.replace("min", "")));
@@ -199,6 +203,7 @@ export async function ingestTwelveDataDataset(params: {
         toDate,
         metadata: {
           provider: "twelve-data",
+          providerSymbol,
           outputsize: 5000,
           sessionDefinition: {
             context: "09:30-09:59 America/New_York opening context",

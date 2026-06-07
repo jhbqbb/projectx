@@ -78,14 +78,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Database className="size-3.5 text-emerald-300" />
                   Dataset
                 </div>
-                <Badge variant="info">QQQ</Badge>
+                <Badge variant="info">NASDAQ</Badge>
               </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[82%] rounded-full bg-cyan-300" />
-              </div>
-              <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-                <span>Coverage</span>
-                <span>82%</span>
+              <div className="mt-3 rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-muted-foreground">
+                Real data only
               </div>
             </div>
           </div>

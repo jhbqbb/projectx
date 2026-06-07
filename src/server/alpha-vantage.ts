@@ -19,6 +19,12 @@ export function normalizeNasdaqTicker(input: string) {
     throw new Error("Ticker must be a Nasdaq-compatible symbol.");
   }
 
+  return ticker;
+}
+
+export function resolveNasdaqProviderSymbol(input: string) {
+  const ticker = normalizeNasdaqTicker(input);
+
   return ticker === "NASDAQ" ? "QQQ" : ticker;
 }
 
@@ -34,7 +40,7 @@ export async function fetchAlphaVantageIntraday(params: {
     throw new Error("ALPHA_VANTAGE_API_KEY is not configured.");
   }
 
-  const ticker = normalizeNasdaqTicker(params.ticker);
+  const ticker = resolveNasdaqProviderSymbol(params.ticker);
   const interval = params.interval ?? "5min";
   const query = new URLSearchParams({
     function: "TIME_SERIES_INTRADAY",
