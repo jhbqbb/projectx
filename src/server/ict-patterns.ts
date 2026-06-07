@@ -101,10 +101,10 @@ type CachedCandles = {
 const cachedCandles = new Map<IctInterval, CachedCandles>();
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const intervalMeta: Record<IctInterval, { label: string; file: string; responseCandles: number }> = {
-  "15min": { label: "15M", file: "nasdaq-qqq-15min-ohlcv.csv", responseCandles: 0 },
-  "1h": { label: "1H", file: "nasdaq-qqq-1h-ohlcv.csv", responseCandles: 2 },
-  "4h": { label: "4H", file: "nasdaq-qqq-4h-ohlcv.csv", responseCandles: 1 }
+const intervalMeta: Record<IctInterval, { label: string; file: string }> = {
+  "15min": { label: "15M", file: "nasdaq-qqq-15min-ohlcv.csv" },
+  "1h": { label: "1H", file: "nasdaq-qqq-1h-ohlcv.csv" },
+  "4h": { label: "4H", file: "nasdaq-qqq-4h-ohlcv.csv" }
 };
 const sessionMeta: Record<IctSession, { label: string; start: string; end: string }> = {
   ALL: { label: "Full session", start: "09:30", end: "16:30" },
@@ -247,15 +247,6 @@ function toRow(accumulator: PatternAccumulator, mode: PatternMode): IctPatternRo
   };
 }
 
-function responseCloseFor(dayCandles: IctCandle[], sweepIndex: number, interval: IctInterval) {
-  if (interval === "15min") {
-    const response = dayCandles.slice(sweepIndex + 1);
-    return response[response.length - 1]?.close ?? null;
-  }
-
-  return dayCandles[sweepIndex + intervalMeta[interval].responseCandles]?.close ?? null;
-}
-
 function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilters>) {
   const accumulators = new Map<string, PatternAccumulator>();
   const minDayCandles = filters.interval === "4h" ? 2 : 3;
@@ -270,12 +261,6 @@ function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilt
 
       for (let sweepIndex = targetIndex + 1; sweepIndex < day.candles.length; sweepIndex += 1) {
         const sweep = day.candles[sweepIndex];
-        const responseClose = responseCloseFor(day.candles, sweepIndex, filters.interval);
-
-        if (!responseClose) {
-          continue;
-        }
-
         const dayLabel = weekdayLabels[target.weekday] ?? "Unk";
         const baseDirections: SweepDirection[] = ["HIGH", "LOW"];
 
@@ -300,8 +285,8 @@ function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilt
           accumulators.set(key, existing);
         }
 
-        const highSweep = sweep.high > target.high && sweep.close < target.high;
-        const lowSweep = sweep.low < target.low && sweep.close > target.low;
+        const highSweep = sweep.high > target.high;
+        const lowSweep = sweep.low < target.low;
         const outcomes: SweepDirection[] = [
           ...(highSweep ? (["HIGH"] as const) : []),
           ...(lowSweep ? (["LOW"] as const) : [])
@@ -317,13 +302,13 @@ function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilt
 
           existing.n += 1;
           if (direction === "HIGH") {
-            const reversed = responseClose < sweep.close;
+            const reversed = sweep.close < target.high;
             existing.reversals += reversed ? 1 : 0;
             existing.continuations += reversed ? 0 : 1;
             existing.depth.push(points(sweep.high - target.high));
             existing.rejection.push(points(sweep.high - sweep.close));
           } else {
-            const reversed = responseClose > sweep.close;
+            const reversed = sweep.close > target.low;
             existing.reversals += reversed ? 1 : 0;
             existing.continuations += reversed ? 0 : 1;
             existing.depth.push(points(target.low - sweep.low));
@@ -396,6 +381,16 @@ function applySessionRange(candles: IctCandle[], session: IctSession) {
   return candles.filter((candle) => candle.time >= sessionRange.start && candle.time <= sessionRange.end);
 }
 
+function rowSweepsInSession(row: IctPatternRow, session: IctSession) {
+  if (session === "ALL") {
+    return true;
+  }
+
+  const sessionRange = sessionMeta[session];
+
+  return row.sweep >= sessionRange.start && row.sweep <= sessionRange.end;
+}
+
 function addClockMinutes(time: string, minutes: number) {
   const [hour, minute] = time.split(":").map(Number);
   const total = hour * 60 + minute + minutes;
@@ -462,8 +457,9 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
   const interval = normalizeInterval(filters.interval);
   const loaded = await loadCandles(interval);
   const normalized = normalizeFilters(filters, { from: loaded.from, to: loaded.to });
-  const rangedCandles = applySessionRange(applyDateRange(loaded.candles, normalized.from, normalized.to), normalized.session);
-  const rows = buildPatternRows(rangedCandles, normalized);
+  const dateCandles = applyDateRange(loaded.candles, normalized.from, normalized.to);
+  const sessionCandles = applySessionRange(dateCandles, normalized.session);
+  const rows = buildPatternRows(dateCandles, normalized).filter((row) => rowSweepsInSession(row, normalized.session));
   const visibleRows = rows.slice(0, 120);
   const topEdge = visibleRows[0] ?? null;
   const weightedNumerator = visibleRows.reduce((sum, row) => sum + (row.edge / 100) * row.n, 0);
@@ -473,7 +469,7 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
   return {
     meta: {
       title: `PROJECTX QQQ ${intervalMeta[normalized.interval].label} ICT Pattern Map`,
-      subtitle: `2Y Nasdaq QQQ ${intervalMeta[normalized.interval].label} sweep map - New York local time`,
+      subtitle: `Nasdaq QQQ ${intervalMeta[normalized.interval].label} sweep map - New York local time`,
       timezone: NY_TIME_ZONE,
       interval: normalized.interval,
       intervalLabel: intervalMeta[normalized.interval].label,
@@ -481,12 +477,12 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
       sessionLabel: sessionMeta[normalized.session].label,
       sessionStart: sessionMeta[normalized.session].start,
       sessionEnd: sessionMeta[normalized.session].end,
-      availableEnd: displayAvailableEnd(rangedCandles, normalized.interval),
+      availableEnd: displayAvailableEnd(sessionCandles, normalized.interval),
       mode: normalized.mode,
       from: normalized.from,
       to: normalized.to,
-      totalCandles: rangedCandles.length,
-      tradingDays: groupByDate(rangedCandles).length,
+      totalCandles: sessionCandles.length,
+      tradingDays: groupByDate(sessionCandles).length,
       sweepEvents: allEvents,
       provider: "Twelve Data",
       symbol: "QQQ",

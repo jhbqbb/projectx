@@ -5,6 +5,7 @@
   "providerExchange": "NASDAQ",
   "providerMicCode": "XNMS",
   "extendedHours": false,
+  "requestedHistoryYears": 5,
   "timestampFormat": "ISO-8601 UTC",
   "columns": [
     "timestamp",
@@ -25,22 +26,22 @@
     {
       "interval": "15min",
       "url": "/data/nasdaq-qqq-15min-ohlcv.csv",
-      "rows": 12960,
-      "from": "2024-06-05T19:45:00.000Z",
+      "rows": 32541,
+      "from": "2021-06-07T13:30:00.000Z",
       "to": "2026-06-05T19:45:00.000Z"
     },
     {
       "interval": "1h",
       "url": "/data/nasdaq-qqq-1h-ohlcv.csv",
-      "rows": 3492,
-      "from": "2024-06-05T19:30:00.000Z",
+      "rows": 8765,
+      "from": "2021-06-07T13:30:00.000Z",
       "to": "2026-06-05T19:30:00.000Z"
     },
     {
       "interval": "4h",
       "url": "/data/nasdaq-qqq-4h-ohlcv.csv",
-      "rows": 999,
-      "from": "2024-06-05T17:30:00.000Z",
+      "rows": 2506,
+      "from": "2021-06-07T13:30:00.000Z",
       "to": "2026-06-05T17:30:00.000Z"
     }
   ]

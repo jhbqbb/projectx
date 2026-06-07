@@ -118,13 +118,16 @@ async function getIctCalculations(question: string) {
       getIctPatternMap({ interval: "4h", mode: "reversal", minN: 3, minEdge: 50 })
     ]);
 
-    return maps.flatMap((map) => [
-      `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} to ${map.meta.to}, all times America/New_York. Available intraday bars in this file currently run through ${map.meta.availableEnd || "the regular close"}.`,
-      `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel} overall reversal read: ${map.summary.weightedEdge}%.`,
-      ...map.rows.slice(0, 3).map(
-        (row) => plainRowLine(`ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
-      )
-    ]);
+    return [
+      "ICT definition used here: a sweep means the later candle takes the target high/low; reversal means it closes back inside; continuation means it closes outside.",
+      ...maps.flatMap((map) => [
+        `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} to ${map.meta.to}, all times America/New_York. Available intraday bars in this file currently run through ${map.meta.availableEnd || "the regular close"}.`,
+        `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel} overall reversal read: ${map.summary.weightedEdge}%.`,
+        ...map.rows.slice(0, 3).map(
+          (row) => plainRowLine(`ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
+        )
+      ])
+    ];
   } catch {
     return [];
   }

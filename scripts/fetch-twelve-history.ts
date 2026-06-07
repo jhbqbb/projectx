@@ -8,6 +8,7 @@ const PLATFORM_TICKER = "NASDAQ";
 const OUTPUT_SIZE = 5000;
 const REQUEST_DELAY_MS = 8200;
 const INCLUDE_PREPOST = process.env.TWELVE_DATA_PREPOST === "true";
+const HISTORY_YEARS = Number(process.env.HISTORY_YEARS ?? 2);
 
 type Interval = "1min" | "15min" | "1h" | "4h";
 
@@ -42,6 +43,13 @@ type Candle = {
   volume: number;
 };
 
+const regularSessionLastOpen: Record<Interval, string> = {
+  "1min": "15:59",
+  "15min": "15:45",
+  "1h": "15:30",
+  "4h": "13:30"
+};
+
 const intervals: Array<{ interval: Interval; minutes: number; file: string }> = [
   { interval: "1min", minutes: 1, file: "public/data/nasdaq-qqq-1min-ohlcv.csv" },
   { interval: "15min", minutes: 15, file: "public/data/nasdaq-qqq-15min-ohlcv.csv" },
@@ -65,6 +73,12 @@ function nyToDate(value: string) {
 
 function dateToNy(value: Date) {
   return format(toZonedTime(value, NY_TIME_ZONE), "yyyy-MM-dd HH:mm:ss");
+}
+
+function isRegularSessionCandle(candle: Candle, interval: Interval) {
+  const time = dateToNy(candle.timestamp).slice(11, 16);
+
+  return time >= "09:30" && time <= regularSessionLastOpen[interval];
 }
 
 function sleep(ms: number) {
@@ -150,7 +164,9 @@ async function fetchInterval(apiKey: string, interval: Interval, minutes: number
       meta = page.meta;
     }
 
-    const candles = page.candles.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const candles = page.candles
+      .filter((candle) => INCLUDE_PREPOST || isRegularSessionCandle(candle, interval))
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
     const first = candles[0]?.timestamp;
     const last = candles[candles.length - 1]?.timestamp;
 
@@ -159,7 +175,7 @@ async function fetchInterval(apiKey: string, interval: Interval, minutes: number
     }
 
     if (!targetStart) {
-      targetStart = subYears(last, 2);
+      targetStart = subYears(last, HISTORY_YEARS);
     }
 
     for (const candle of candles) {
@@ -190,6 +206,11 @@ async function fetchInterval(apiKey: string, interval: Interval, minutes: number
 
 async function main() {
   const apiKey = requireApiKey();
+
+  if (!Number.isFinite(HISTORY_YEARS) || HISTORY_YEARS < 1) {
+    throw new Error("HISTORY_YEARS must be a number greater than or equal to 1.");
+  }
+
   const requestedIntervals = (process.env.ONLY_INTERVALS ?? "")
     .split(",")
     .map((item) => item.trim())
@@ -245,6 +266,7 @@ async function main() {
         providerExchange: "NASDAQ",
         providerMicCode: "XNMS",
         extendedHours: INCLUDE_PREPOST,
+        requestedHistoryYears: HISTORY_YEARS,
         timestampFormat: "ISO-8601 UTC",
         columns: ["timestamp", "open", "high", "low", "close", "volume"],
         files: intervals

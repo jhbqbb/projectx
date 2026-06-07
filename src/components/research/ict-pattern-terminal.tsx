@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronUp, Loader2, Mic, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type PatternMode = "reversal" | "continuation";
@@ -91,6 +92,34 @@ type IctPatternPayload = {
   directionSummaries: DirectionSummary[];
   watchlist: IctPatternRow[];
   rows: IctPatternRow[];
+};
+
+type DataAudit = {
+  generatedAt: string;
+  status: "verified" | "needs_review";
+  displayedStatsUseFallbacks: boolean;
+  statement: string;
+  primarySource: {
+    provider: string;
+    symbol: string;
+    exchange: string;
+    micCode: string;
+    extendedHours: boolean;
+    requestedHistoryYears: number | null;
+    files: Array<{ interval: string; rows: number; from: string; to: string }>;
+  };
+  checks: {
+    dailyClose: {
+      overlappingDays: number;
+      averageAbsCloseDiff: number;
+      maxAbsCloseDiff: number;
+    };
+    intraday15mClose: {
+      matchedBars: number;
+      averageAbsCloseDiff: number;
+      maxAbsCloseDiff: number;
+    };
+  };
 };
 
 const days = ["ALL", "MON", "TUE", "WED", "THU", "FRI"];
@@ -222,6 +251,40 @@ function TinyButton({
   );
 }
 
+function SelectField({
+  label,
+  value,
+  options,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="min-w-0 space-y-1">
+      <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2]">{label}</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-9 rounded-none border-[#284553] bg-[#07151b] px-3 font-mono text-[11px] font-black uppercase tracking-[0.12em] text-[#d8edf2] shadow-none focus:ring-[#9fd4e6]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="rounded-none border-[#284553] bg-[#07151b] font-mono text-[#d8edf2]">
+          {options.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              className="rounded-none text-[11px] font-bold uppercase tracking-[0.08em] focus:bg-[#9fd4e6] focus:text-[#061923]"
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
+  );
+}
+
 function StatLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-[#24414d] py-2 text-[11px]">
@@ -263,6 +326,7 @@ function PatternCard({ row, mode }: { row: IctPatternRow; mode: PatternMode }) {
 
 export function IctPatternTerminal() {
   const [data, setData] = useState<IctPatternPayload | null>(null);
+  const [audit, setAudit] = useState<DataAudit | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<PatternMode>("reversal");
   const [interval, setInterval] = useState<IctInterval>("15min");
@@ -326,6 +390,23 @@ export function IctPatternTerminal() {
       mounted = false;
     };
   }, [query]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch("/data/nasdaq-data-audit.json")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: DataAudit | null) => {
+        if (mounted) setAudit(payload);
+      })
+      .catch(() => {
+        if (mounted) setAudit(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function setRange(months: number | "FULL") {
     if (!data) return;
@@ -403,7 +484,25 @@ export function IctPatternTerminal() {
   const lowSummary = data?.directionSummaries.find((item) => item.direction === "LOW");
   const activeInterval = timeframes.find((item) => item.value === interval);
   const activeSession = sessions.find((item) => item.value === session);
-  const timeOptions = useMemo(() => buildTimeOptions(interval, session), [interval, session]);
+  const targetOptions = useMemo(() => buildTimeOptions(interval, "ALL"), [interval]);
+  const sweepOptions = useMemo(() => buildTimeOptions(interval, session), [interval, session]);
+  const auditIntervalFile = audit?.primarySource.files.find((file) => file.interval === interval);
+  const targetSelectOptions = useMemo(
+    () =>
+      targetOptions.map((time) => ({
+        value: time,
+        label: time === "ALL" ? "Any target" : interval === "4h" ? `${time} block` : time
+      })),
+    [interval, targetOptions]
+  );
+  const sweepSelectOptions = useMemo(
+    () =>
+      sweepOptions.map((time) => ({
+        value: time,
+        label: time === "ALL" ? "Any sweep" : interval === "4h" ? `${time} block` : time
+      })),
+    [interval, sweepOptions]
+  );
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-black px-2 py-4 font-mono text-[#d8edf2] sm:px-4 lg:px-6">
@@ -428,11 +527,6 @@ export function IctPatternTerminal() {
           <div className="flex flex-wrap gap-2">
             {timeframes.map((item) => (
               <TinyButton key={item.value} active={interval === item.value} onClick={() => setInterval(item.value)}>
-                {item.label}
-              </TinyButton>
-            ))}
-            {sessions.map((item) => (
-              <TinyButton key={item.value} active={session === item.value} onClick={() => setSession(item.value)}>
                 {item.label}
               </TinyButton>
             ))}
@@ -577,6 +671,51 @@ export function IctPatternTerminal() {
         </TerminalPanel>
 
         <TerminalPanel className="p-3 sm:p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// DATA AUDIT"}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    "border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]",
+                    audit?.status === "verified"
+                      ? "border-[#78ad8e] bg-[#78ad8e] text-[#06130d]"
+                      : "border-[#d08189] bg-[#2a2630] text-[#e0a8b0]"
+                  )}
+                >
+                  {audit?.status === "verified" ? "cross-checked" : "audit pending"}
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#86a4ac]">
+                  {audit?.displayedStatsUseFallbacks === false ? "no demo fallback stats" : "loading audit"}
+                </span>
+              </div>
+            </div>
+            <div className="text-[10px] leading-5 text-[#9eb8c0]">
+              <div className="font-black uppercase tracking-[0.14em] text-[#d8edf2]">
+                {audit?.primarySource.provider ?? data?.meta.provider ?? "Twelve Data"} {audit?.primarySource.symbol ?? "QQQ"}
+              </div>
+              <div>
+                {auditIntervalFile
+                  ? `${formatCount(auditIntervalFile.rows)} ${interval.toUpperCase()} candles bundled`
+                  : `${formatCount(data?.meta.totalCandles ?? 0)} ${interval.toUpperCase()} candles loaded`}
+              </div>
+              <div>{audit?.primarySource.extendedHours ? "Regular + extended hours" : "Regular session candles only"}</div>
+            </div>
+            <div className="text-[10px] leading-5 text-[#9eb8c0]">
+              <div className="font-black uppercase tracking-[0.14em] text-[#d8edf2]">Yahoo validation</div>
+              <div>
+                Daily close: {formatCount(audit?.checks.dailyClose.overlappingDays ?? 0)} days, avg diff{" "}
+                {audit?.checks.dailyClose.averageAbsCloseDiff ?? "--"}
+              </div>
+              <div>
+                15M close: {formatCount(audit?.checks.intraday15mClose.matchedBars ?? 0)} bars, avg diff{" "}
+                {audit?.checks.intraday15mClose.averageAbsCloseDiff ?? "--"}
+              </div>
+            </div>
+          </div>
+        </TerminalPanel>
+
+        <TerminalPanel className="p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="mr-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// LIVE LOOKUP"}</div>
             <TinyButton active={lookupMode === "exact"} onClick={() => applyLookup("exact")}>
@@ -624,49 +763,47 @@ export function IctPatternTerminal() {
         <AnimatePresence>
           {filtersOpen ? (
             <TerminalPanel className="p-3" key="filters">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2]">Mode</span>
-                <TinyButton active={mode === "reversal"} onClick={() => setMode("reversal")}>
-                  Reversal
-                </TinyButton>
-                <TinyButton active={mode === "continuation"} onClick={() => setMode("continuation")}>
-                  Continuation
-                </TinyButton>
-                <span className="ml-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">Day</span>
-                {days.map((item) => (
-                  <TinyButton key={item} active={day === item} onClick={() => setDay(item)}>
-                    {item}
-                  </TinyButton>
-                ))}
-                <span className="ml-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">Direction</span>
-                {(["BOTH", "HIGH", "LOW"] as const).map((item) => (
-                  <TinyButton key={item} active={direction === item} onClick={() => setDirection(item)}>
-                    {item}
-                  </TinyButton>
-                ))}
-                <span className="ml-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">Target</span>
-                <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
-                  {timeOptions.map((item) => (
-                    <TinyButton key={`target-${item}`} active={targetTime === item} onClick={() => setTargetTime(item)}>
-                      {item}
-                    </TinyButton>
-                  ))}
-                </div>
-                <span className="ml-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">Sweep</span>
-                <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
-                  {timeOptions.map((item) => (
-                    <TinyButton key={`sweep-${item}`} active={sweepTime === item} onClick={() => setSweepTime(item)}>
-                      {item}
-                    </TinyButton>
-                  ))}
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                <SelectField
+                  label="Mode"
+                  value={mode}
+                  onChange={(value) => setMode(value === "continuation" ? "continuation" : "reversal")}
+                  options={[
+                    { value: "reversal", label: "Reversal" },
+                    { value: "continuation", label: "Continuation" }
+                  ]}
+                />
+                <SelectField
+                  label="Session"
+                  value={session}
+                  onChange={(value) => setSession(value === "AM" || value === "PM" ? value : "ALL")}
+                  options={sessions.map((item) => ({ value: item.value, label: `${item.label} - ${item.description}` }))}
+                />
+                <SelectField
+                  label="Day"
+                  value={day}
+                  onChange={setDay}
+                  options={days.map((item) => ({ value: item, label: item === "ALL" ? "All days" : item }))}
+                />
+                <SelectField
+                  label="Direction"
+                  value={direction}
+                  onChange={(value) => setDirection(value === "HIGH" || value === "LOW" ? value : "BOTH")}
+                  options={[
+                    { value: "BOTH", label: "Both" },
+                    { value: "HIGH", label: "High sweep" },
+                    { value: "LOW", label: "Low sweep" }
+                  ]}
+                />
+                <SelectField label="Target" value={targetTime} onChange={setTargetTime} options={targetSelectOptions} />
+                <SelectField label="Sweep" value={sweepTime} onChange={setSweepTime} options={sweepSelectOptions} />
               </div>
             </TerminalPanel>
           ) : null}
         </AnimatePresence>
 
         <div className="border-l-2 border-[#d06f7a] bg-[#2a2630] px-3 py-2 text-[11px] font-semibold text-[#e0a8b0]">
-          {`// ${mode === "reversal" ? "REVERSAL MODE" : "CONTINUATION MODE"} - Target candle level is swept by a later candle. Edge is calculated from the response path.`}
+          {`// ${mode === "reversal" ? "REVERSAL MODE" : "CONTINUATION MODE"} - A later candle takes the target high/low. Reversal means it closes back inside; continuation means it closes outside.`}
         </div>
         <div className="border-l-2 border-[#9fd4e6] bg-[#10242d] px-3 py-2 text-[10px] font-semibold text-[#9eb8c0]">
           Each row is calculated from real historical QQQ candles. Date range, session, day, direction, target, and sweep filters change every calculation.
