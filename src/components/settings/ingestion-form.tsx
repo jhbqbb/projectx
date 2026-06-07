@@ -1,15 +1,31 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Loader2, UploadCloud } from "lucide-react";
+import { FileDown, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const bundledFiles = [
+  {
+    interval: "1min",
+    label: "Nasdaq QQQ 1 minute",
+    name: "NASDAQ QQQ 1min Twelve Data OHLCV",
+    url: "/data/nasdaq-qqq-1min-ohlcv.csv"
+  },
+  {
+    interval: "15min",
+    label: "Nasdaq QQQ 15 minute",
+    name: "NASDAQ QQQ 15min Twelve Data OHLCV",
+    url: "/data/nasdaq-qqq-15min-ohlcv.csv"
+  }
+] as const;
+
 export function IngestionForm() {
   const [interval, setIntervalValue] = useState("15min");
   const [provider, setProvider] = useState("twelve-data");
+  const [bundledLoading, setBundledLoading] = useState<string | null>(null);
   const [status, setStatus] = useState<{ tone: "success" | "error" | "idle"; message: string }>({
     tone: "idle",
     message: ""
@@ -56,6 +72,52 @@ export function IngestionForm() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function ingestBundled(file: (typeof bundledFiles)[number]) {
+    setBundledLoading(file.interval);
+    setStatus({ tone: "idle", message: "" });
+
+    try {
+      const csvResponse = await fetch(file.url);
+
+      if (!csvResponse.ok) {
+        throw new Error(`Unable to fetch ${file.url}.`);
+      }
+
+      const csv = await csvResponse.text();
+      const uploadResponse = await fetch("/api/datasets/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: "NASDAQ",
+          name: file.name,
+          interval: file.interval,
+          sessionTemplate: "opening",
+          csv
+        })
+      });
+      const payload = (await uploadResponse.json()) as {
+        error?: string;
+        dataset?: { tradingDayCount: number; candleCount: number; name: string; ticker: string };
+      };
+
+      if (!uploadResponse.ok || payload.error) {
+        throw new Error(payload.error ?? "Unable to ingest bundled OHLCV.");
+      }
+
+      setStatus({
+        tone: "success",
+        message: `Ingested ${payload.dataset?.candleCount ?? 0} bundled candles and ${payload.dataset?.tradingDayCount ?? 0} trading days from ${file.label}.`
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Unable to ingest bundled OHLCV."
+      });
+    } finally {
+      setBundledLoading(null);
     }
   }
 
@@ -112,6 +174,38 @@ export function IngestionForm() {
           {loading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
           Fetch market data
         </Button>
+      </div>
+      <div className="md:col-span-2 rounded-md border border-white/10 bg-black/20 p-3">
+        <div className="text-sm font-medium">Bundled real OHLCV files</div>
+        <div className="mt-1 text-xs leading-5 text-muted-foreground">
+          Static Twelve Data QQQ files are available without provider env vars. Use these when you want to ingest from CSV.
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {bundledFiles.map((file) => (
+            <div key={file.interval} className="rounded-md border border-white/8 bg-white/[0.035] p-3">
+              <div className="text-sm font-medium">{file.label}</div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">{file.url}</div>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => ingestBundled(file)}
+                  disabled={Boolean(bundledLoading)}
+                >
+                  {bundledLoading === file.interval ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
+                  Ingest
+                </Button>
+                <Button type="button" variant="ghost" size="sm" asChild>
+                  <a href={file.url} download>
+                    <FileDown className="size-4" />
+                    CSV
+                  </a>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       {status.message ? (
         <div

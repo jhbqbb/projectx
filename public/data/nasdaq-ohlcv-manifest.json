@@ -1,0 +1,23 @@
+{
+  "source": "Twelve Data",
+  "platformTicker": "NASDAQ",
+  "providerSymbol": "QQQ",
+  "timestampFormat": "ISO-8601 UTC",
+  "columns": ["timestamp", "open", "high", "low", "close", "volume"],
+  "files": [
+    {
+      "interval": "1min",
+      "url": "/data/nasdaq-qqq-1min-ohlcv.csv",
+      "rows": 5000,
+      "from": "2026-05-19T14:40:00.000Z",
+      "to": "2026-06-05T19:59:00.000Z"
+    },
+    {
+      "interval": "15min",
+      "url": "/data/nasdaq-qqq-15min-ohlcv.csv",
+      "rows": 5000,
+      "from": "2025-08-28T18:30:00.000Z",
+      "to": "2026-06-05T19:45:00.000Z"
+    }
+  ]
+}

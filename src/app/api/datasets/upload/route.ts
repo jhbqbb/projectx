@@ -9,6 +9,7 @@ const uploadSchema = z.object({
   ticker: z.string().min(1).max(12).default("NASDAQ"),
   name: z.string().min(1).max(120).default("Uploaded Nasdaq dataset"),
   interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).default("5min"),
+  sessionTemplate: z.enum(["premarket", "opening"]).default("opening"),
   csv: z.string().min(10)
 });
 
@@ -65,7 +66,8 @@ export async function POST(request: NextRequest) {
       ticker: body.ticker,
       name: body.name,
       interval: body.interval,
-      candles
+      candles,
+      sessionTemplate: body.sessionTemplate
     });
 
     return NextResponse.json({ dataset });

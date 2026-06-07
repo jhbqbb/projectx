@@ -307,10 +307,15 @@ export async function createDatasetFromCandles(params: {
   name: string;
   interval: AlphaVantageInterval;
   candles: CandleInput[];
+  sessionTemplate?: "premarket" | "opening";
 }) {
   const ticker = normalizeNasdaqTicker(params.ticker);
   const intervalEnum = intervalToPrisma[params.interval];
-  const tradingDays = deriveTradingDaysFromCandles(params.candles, Number(params.interval.replace("min", "")));
+  const intervalMinutes = Number(params.interval.replace("min", ""));
+  const tradingDays =
+    params.sessionTemplate === "opening"
+      ? deriveOpeningContextTradingDaysFromCandles(params.candles, intervalMinutes)
+      : deriveTradingDaysFromCandles(params.candles, intervalMinutes);
   const coverageScore = tradingDays.length
     ? tradingDays.reduce((sum, day) => sum + day.dataQualityScore, 0) / tradingDays.length
     : 0;
@@ -324,7 +329,10 @@ export async function createDatasetFromCandles(params: {
       status: "PENDING",
       interval: intervalEnum,
       fromDate: params.candles[0]?.timestamp,
-      toDate: params.candles[params.candles.length - 1]?.timestamp
+      toDate: params.candles[params.candles.length - 1]?.timestamp,
+      metadata: {
+        sessionTemplate: params.sessionTemplate ?? "premarket"
+      }
     }
   });
 

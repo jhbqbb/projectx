@@ -26,6 +26,16 @@ The platform is configured for minute-candle research. Twelve Data is the defaul
 
 Alpha Vantage can still be selected when the key has intraday access. Twelve Data pre/post-market data requires a paid provider plan; without that plan, ProjectX uses regular-session minute candles only.
 
+## Bundled OHLCV Data
+
+Real Nasdaq-tracking QQQ OHLCV CSV files are published as static website assets:
+
+- `/data/nasdaq-qqq-1min-ohlcv.csv` - 5,000 one-minute candles from Twelve Data.
+- `/data/nasdaq-qqq-15min-ohlcv.csv` - 5,000 fifteen-minute candles from Twelve Data.
+- `/data/nasdaq-ohlcv-manifest.json` - file metadata, row counts, and coverage ranges.
+
+In Settings, use the bundled OHLCV ingest buttons to fetch these files and upload them into PostgreSQL. This still requires a working `DATABASE_URL`, because ingested candles and derived session statistics are stored in the database.
+
 ## Report Modules
 
 - Context vs Regular Session
