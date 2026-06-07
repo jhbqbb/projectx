@@ -97,7 +97,7 @@ export async function getBundledResearchSnapshot(): Promise<AnalyticsSnapshot> {
     return cachedSnapshot;
   }
 
-  const csvPath = path.join(process.cwd(), "public", "data", "nasdaq-qqq-15min-ohlcv.csv");
+  const csvPath = path.join(process.cwd(), "public", "data", "nasdaq-ndx-15min-ohlcv.csv");
   const csv = await readFile(csvPath, "utf8");
   const candles = parseCandles(csv);
   const sessions = deriveOpeningContextTradingDaysFromCandles(candles, 15);
@@ -112,10 +112,10 @@ export async function getBundledResearchSnapshot(): Promise<AnalyticsSnapshot> {
   cachedSnapshot = {
     hasData: true,
     dataset: {
-      id: "bundled-nasdaq-qqq-15min",
-      name: "Bundled Nasdaq QQQ 15min Twelve Data OHLCV 2Y",
-      ticker: "NASDAQ",
-      source: "BUNDLED_TWELVE_DATA",
+      id: "bundled-nasdaq-ndx-15min",
+      name: "Bundled Nasdaq 100 Index 15min Yahoo OHLCV",
+      ticker: "^NDX",
+      source: "BUNDLED_YAHOO_INDEX",
       interval: "FIFTEEN_MINUTES",
       candleCount: candles.length,
       tradingDayCount: sessions.length,
@@ -144,9 +144,9 @@ export async function getBundledResearchSnapshot(): Promise<AnalyticsSnapshot> {
     },
     patterns,
     warnings: [
-      "Using bundled real Twelve Data QQQ 15-minute OHLCV because PostgreSQL is not connected for this deployment.",
+      "Using bundled real Nasdaq 100 Index 15-minute OHLCV because PostgreSQL is not connected for this deployment.",
       "Sample size is modest. Treat this as descriptive research, not proof of an edge.",
-      "Twelve Data pre/post-market data requires a paid provider plan, so this dataset uses 09:30-09:59 opening context and 10:00-15:59 response."
+      "This bundled index dataset uses regular-session candles only: 09:30-09:59 opening context and 10:00-15:59 response."
     ]
   };
 

@@ -35,7 +35,7 @@ export function buildResearchContext(params: {
   const sql = hasSessionData
     ? buildQuestionSql(params.question, params.selectedReports)
     : hasIctData
-      ? "Bundled ICT sweep maps are calculated directly from static QQQ OHLCV CSV files; no database SQL is required for this view."
+      ? "Bundled ICT sweep maps are calculated directly from static Nasdaq 100 Index OHLCV CSV files; no database SQL is required for this view."
       : "No SQL plan yet. Ingest data first.";
   const patterns = hasSessionData ? findPatternCandidates(days) : [];
   const strongestExpectancyPatterns = patterns
@@ -60,9 +60,9 @@ export function buildResearchContext(params: {
         ]
       : hasIctData
         ? [
-            "Session-day database snapshot is not connected; using bundled Twelve Data QQQ OHLCV ICT pattern maps as source of truth."
+            "Session-day database snapshot is not connected; using bundled real Nasdaq 100 Index OHLCV ICT pattern maps as source of truth."
           ]
-        : ["No historical dataset is available yet. Ingest Twelve Data minute candles or upload OHLCV first."])
+        : ["No historical dataset is available yet. Ingest or upload Nasdaq index OHLCV first."])
   ];
 
   return {
@@ -105,7 +105,7 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
       "",
       context.noDataReason ? `Reason: ${context.noDataReason}` : "",
       "",
-      "Ingest Twelve Data minute-candle data or upload an OHLCV dataset first. After ingestion, I can analyze trading questions across reports, patterns, sessions, weekdays, gaps, ranges, opens, and reversals."
+      "Ingest Nasdaq index OHLCV data or upload an OHLCV dataset first. After ingestion, I can analyze trading questions across reports, patterns, sessions, weekdays, gaps, ranges, opens, and reversals."
     ]
       .filter((line, index, lines) => line || lines[index - 1])
       .join("\n");
@@ -113,9 +113,9 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
 
   if (context.ictCalculations.length && context.summary.sampleSize === 0) {
     return [
-      `I analyzed the bundled real Nasdaq QQQ ICT sweep maps for: "${question}".`,
+      `I analyzed the bundled real Nasdaq 100 Index ICT sweep maps for: "${question}".`,
       "",
-      "Source: Twelve Data QQQ OHLCV CSVs bundled in the website. All timestamps are converted to America/New_York.",
+      "Source: Yahoo Finance chart endpoint for ^NDX, bundled in the website. All timestamps are converted to America/New_York.",
       "",
       ...context.ictCalculations.slice(0, 12),
       "",
@@ -162,11 +162,11 @@ Do not invent trades, live prices, or causal certainty.
 All times must be written in America/New_York local time.
 Understand ICT-style terminology as research labels only: liquidity sweep, high sweep, low sweep, wick through a prior candle level, close back inside, reversal/fade, continuation/follow-through, displacement, opening range, session timing, and sample-quality risk.
 Answer broadly across trading research topics: sessions, gaps, opens, ranges, sweeps, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
-If ICT sweep map calculations are supplied, answer from those real QQQ OHLCV calculations even when the database session snapshot is unavailable.
+If ICT sweep map calculations are supplied, answer from those real Nasdaq 100 Index OHLCV calculations even when the database session snapshot is unavailable.
 Explain findings in plain English with probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.
 Do not expose raw notation such as n=, CI brackets, SQL snippets, variable names, row IDs, or formula-style output unless the user explicitly asks for technical details.
 Prefer short text answers: state the setup, the reversal or continuation read, the bias, and the risk in normal trading language.
-If no dataset exists, say "No data available yet" and tell the user to ingest Twelve Data minute candles or upload OHLCV.
+If no dataset exists, say "No data available yet" and tell the user to ingest Nasdaq index OHLCV or upload OHLCV.
 When a sample is weak, say so clearly.
 
 Available report modules:

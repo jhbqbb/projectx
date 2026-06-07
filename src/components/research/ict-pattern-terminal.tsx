@@ -101,23 +101,34 @@ type DataAudit = {
   statement: string;
   primarySource: {
     provider: string;
+    instrumentName?: string;
     symbol: string;
     exchange: string;
-    micCode: string;
+    exchangeCode?: string;
+    instrumentType?: string;
+    micCode?: string;
     extendedHours: boolean;
-    requestedHistoryYears: number | null;
+    requestedHistoryYears?: number | null;
     files: Array<{ interval: string; rows: number; from: string; to: string }>;
   };
-  checks: {
-    dailyClose: {
-      overlappingDays: number;
-      averageAbsCloseDiff: number;
-      maxAbsCloseDiff: number;
+  checks?: {
+    sourceIdentity?: {
+      symbol?: string;
+      fullExchangeName?: string;
+      instrumentType?: string;
+      timezone?: string;
     };
-    intraday15mClose: {
-      matchedBars: number;
-      averageAbsCloseDiff: number;
-      maxAbsCloseDiff: number;
+    availableHistory?: {
+      oneMinuteRows?: number;
+      fifteenMinuteRows?: number;
+      oneHourRows?: number;
+      fourHourRows?: number;
+      dailyRows?: number;
+    };
+    sessionFilter?: {
+      oneMinuteOffSessionRowsAfterFilter?: number;
+      fifteenMinuteOffSessionRowsAfterFilter?: number;
+      oneHourOffSessionRowsAfterFilter?: number;
     };
   };
 };
@@ -514,11 +525,11 @@ export function IctPatternTerminal() {
               <div className="text-2xl font-black uppercase tracking-[0.26em] text-white sm:text-4xl">PROJECTX</div>
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#9fd4e6]">
                 <Sparkles className="size-3" />
-                real QQQ research terminal
+                real Nasdaq index research terminal
               </div>
             </div>
             <div className="mt-3 text-[11px] font-black uppercase tracking-[0.22em] text-[#9fc7d1]">
-              {`// ${data?.meta.title ?? "PROJECTX QQQ 15M ICT Pattern Map"}`}
+              {`// ${data?.meta.title ?? "PROJECTX NDX 15M ICT Pattern Map"}`}
             </div>
             <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#7fa1aa]">
               {data?.meta.subtitle ?? "Loading Nasdaq statistics"} - {data?.meta.sessionLabel ?? activeSession?.description} - Timezone: America/New_York
@@ -573,7 +584,7 @@ export function IctPatternTerminal() {
                   </div>
                 </div>
                 <div className="mt-2 border-l-2 border-[#d06f7a] bg-[#2a2630] px-3 py-2 text-[11px] font-semibold text-[#e0a8b0]">
-                  {"// AI reads the current real Nasdaq QQQ dataset. All session and sweep times are New York local time."}
+                  {"// AI reads the current real Nasdaq 100 Index dataset. All session and sweep times are New York local time."}
                 </div>
                 <div
                   className={cn(
@@ -635,7 +646,7 @@ export function IctPatternTerminal() {
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// DATE RANGE"}</div>
               <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#6f8f99]">
-                {activeInterval?.label} - {activeInterval?.description} - {activeSession?.description} - source {data?.meta.provider ?? "Twelve Data"}
+                {activeInterval?.label} - {activeInterval?.description} - {activeSession?.description} - source {data?.meta.provider ?? "Yahoo Finance chart endpoint"}
               </div>
             </div>
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#86a4ac]">
@@ -683,7 +694,7 @@ export function IctPatternTerminal() {
                       : "border-[#d08189] bg-[#2a2630] text-[#e0a8b0]"
                   )}
                 >
-                  {audit?.status === "verified" ? "cross-checked" : "audit pending"}
+                  {audit?.status === "verified" ? "index verified" : "audit pending"}
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#86a4ac]">
                   {audit?.displayedStatsUseFallbacks === false ? "no demo fallback stats" : "loading audit"}
@@ -692,7 +703,7 @@ export function IctPatternTerminal() {
             </div>
             <div className="text-[10px] leading-5 text-[#9eb8c0]">
               <div className="font-black uppercase tracking-[0.14em] text-[#d8edf2]">
-                {audit?.primarySource.provider ?? data?.meta.provider ?? "Twelve Data"} {audit?.primarySource.symbol ?? "QQQ"}
+                {audit?.primarySource.instrumentName ?? "Nasdaq 100 Index"} {audit?.primarySource.symbol ?? "^NDX"}
               </div>
               <div>
                 {auditIntervalFile
@@ -702,14 +713,14 @@ export function IctPatternTerminal() {
               <div>{audit?.primarySource.extendedHours ? "Regular + extended hours" : "Regular session candles only"}</div>
             </div>
             <div className="text-[10px] leading-5 text-[#9eb8c0]">
-              <div className="font-black uppercase tracking-[0.14em] text-[#d8edf2]">Yahoo validation</div>
+              <div className="font-black uppercase tracking-[0.14em] text-[#d8edf2]">Index audit</div>
               <div>
-                Daily close: {formatCount(audit?.checks.dailyClose.overlappingDays ?? 0)} days, avg diff{" "}
-                {audit?.checks.dailyClose.averageAbsCloseDiff ?? "--"}
+                Identity: {audit?.checks?.sourceIdentity?.instrumentType ?? "INDEX"} on{" "}
+                {audit?.checks?.sourceIdentity?.fullExchangeName ?? "Nasdaq GIDS"}
               </div>
               <div>
-                15M close: {formatCount(audit?.checks.intraday15mClose.matchedBars ?? 0)} bars, avg diff{" "}
-                {audit?.checks.intraday15mClose.averageAbsCloseDiff ?? "--"}
+                Clean session rows: {formatCount(audit?.checks?.availableHistory?.fifteenMinuteRows ?? 0)} 15M /{" "}
+                {formatCount(audit?.checks?.availableHistory?.oneHourRows ?? 0)} 1H
               </div>
             </div>
           </div>
@@ -752,7 +763,7 @@ export function IctPatternTerminal() {
                   <div className="mt-3 border border-[#284553] bg-[#0c2029] p-3 text-[10px] leading-5 text-[#9eb8c0]">
                     {"// ICT manipulation before expansion"}
                     <br />
-                    {summary.manipulation}. Depth and rejection are measured from real QQQ {data?.meta.intervalLabel ?? "15M"} candles.
+                    {summary.manipulation}. Depth and rejection are measured from real Nasdaq 100 Index {data?.meta.intervalLabel ?? "15M"} candles.
                   </div>
                 </TerminalPanel>
               ) : null
@@ -806,7 +817,7 @@ export function IctPatternTerminal() {
           {`// ${mode === "reversal" ? "REVERSAL MODE" : "CONTINUATION MODE"} - A later candle takes the target high/low. Reversal means it closes back inside; continuation means it closes outside.`}
         </div>
         <div className="border-l-2 border-[#9fd4e6] bg-[#10242d] px-3 py-2 text-[10px] font-semibold text-[#9eb8c0]">
-          Each row is calculated from real historical QQQ candles. Date range, session, day, direction, target, and sweep filters change every calculation.
+          Each row is calculated from real historical Nasdaq 100 Index candles. Date range, session, day, direction, target, and sweep filters change every calculation.
         </div>
 
         <TerminalPanel className="p-3 sm:p-4">

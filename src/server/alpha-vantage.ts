@@ -25,7 +25,7 @@ export function normalizeNasdaqTicker(input: string) {
 export function resolveNasdaqProviderSymbol(input: string) {
   const ticker = normalizeNasdaqTicker(input);
 
-  return ticker === "NASDAQ" ? "QQQ" : ticker;
+  return ticker === "NASDAQ" ? "NDX" : ticker;
 }
 
 export async function fetchAlphaVantageIntraday(params: {

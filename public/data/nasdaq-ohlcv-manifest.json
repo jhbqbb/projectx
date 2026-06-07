@@ -1,12 +1,14 @@
 {
-  "source": "Twelve Data",
-  "platformTicker": "NASDAQ",
-  "providerSymbol": "QQQ",
-  "providerExchange": "NASDAQ",
-  "providerMicCode": "XNMS",
+  "source": "Yahoo Finance chart endpoint",
+  "platformTicker": "NASDAQ_INDEX",
+  "instrumentName": "Nasdaq 100 Index",
+  "providerSymbol": "^NDX",
+  "providerExchange": "Nasdaq GIDS",
+  "providerExchangeCode": "NIM",
+  "instrumentType": "INDEX",
   "extendedHours": false,
-  "requestedHistoryYears": 5,
   "timestampFormat": "ISO-8601 UTC",
+  "timezoneForCalculations": "America/New_York",
   "columns": [
     "timestamp",
     "open",
@@ -18,31 +20,32 @@
   "files": [
     {
       "interval": "1min",
-      "url": "/data/nasdaq-qqq-1min-ohlcv.csv",
-      "rows": 194282,
-      "from": "2024-06-05T19:59:00.000Z",
+      "url": "/data/nasdaq-ndx-1min-ohlcv.csv",
+      "rows": 3120,
+      "from": "2026-05-27T13:30:00.000Z",
       "to": "2026-06-05T19:59:00.000Z"
     },
     {
       "interval": "15min",
-      "url": "/data/nasdaq-qqq-15min-ohlcv.csv",
-      "rows": 32541,
-      "from": "2021-06-07T13:30:00.000Z",
+      "url": "/data/nasdaq-ndx-15min-ohlcv.csv",
+      "rows": 1560,
+      "from": "2026-03-12T13:30:00.000Z",
       "to": "2026-06-05T19:45:00.000Z"
     },
     {
       "interval": "1h",
-      "url": "/data/nasdaq-qqq-1h-ohlcv.csv",
-      "rows": 8765,
-      "from": "2021-06-07T13:30:00.000Z",
+      "url": "/data/nasdaq-ndx-1h-ohlcv.csv",
+      "rows": 5089,
+      "from": "2023-07-11T13:30:00.000Z",
       "to": "2026-06-05T19:30:00.000Z"
     },
     {
       "interval": "4h",
-      "url": "/data/nasdaq-qqq-4h-ohlcv.csv",
-      "rows": 2506,
-      "from": "2021-06-07T13:30:00.000Z",
-      "to": "2026-06-05T17:30:00.000Z"
+      "url": "/data/nasdaq-ndx-4h-ohlcv.csv",
+      "rows": 1453,
+      "from": "2023-07-11T13:30:00.000Z",
+      "to": "2026-06-05T17:30:00.000Z",
+      "derivedFrom": "1h"
     }
   ]
 }

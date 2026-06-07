@@ -102,9 +102,9 @@ const cachedCandles = new Map<IctInterval, CachedCandles>();
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const intervalMeta: Record<IctInterval, { label: string; file: string }> = {
-  "15min": { label: "15M", file: "nasdaq-qqq-15min-ohlcv.csv" },
-  "1h": { label: "1H", file: "nasdaq-qqq-1h-ohlcv.csv" },
-  "4h": { label: "4H", file: "nasdaq-qqq-4h-ohlcv.csv" }
+  "15min": { label: "15M", file: "nasdaq-ndx-15min-ohlcv.csv" },
+  "1h": { label: "1H", file: "nasdaq-ndx-1h-ohlcv.csv" },
+  "4h": { label: "4H", file: "nasdaq-ndx-4h-ohlcv.csv" }
 };
 const sessionMeta: Record<IctSession, { label: string; start: string; end: string }> = {
   ALL: { label: "Full session", start: "09:30", end: "16:30" },
@@ -468,8 +468,8 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
 
   return {
     meta: {
-      title: `PROJECTX QQQ ${intervalMeta[normalized.interval].label} ICT Pattern Map`,
-      subtitle: `Nasdaq QQQ ${intervalMeta[normalized.interval].label} sweep map - New York local time`,
+      title: `PROJECTX NDX ${intervalMeta[normalized.interval].label} ICT Pattern Map`,
+      subtitle: `Nasdaq 100 Index ${intervalMeta[normalized.interval].label} sweep map - New York local time`,
       timezone: NY_TIME_ZONE,
       interval: normalized.interval,
       intervalLabel: intervalMeta[normalized.interval].label,
@@ -484,10 +484,10 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
       totalCandles: sessionCandles.length,
       tradingDays: groupByDate(sessionCandles).length,
       sweepEvents: allEvents,
-      provider: "Twelve Data",
-      symbol: "QQQ",
-      exchange: "NASDAQ",
-      micCode: "XNMS"
+      provider: "Yahoo Finance chart endpoint",
+      symbol: "^NDX",
+      exchange: "Nasdaq GIDS",
+      micCode: "NIM"
     },
     filters: normalized,
     summary: {

@@ -90,7 +90,7 @@ export async function getResearchSnapshot(params: SnapshotParams = {}): Promise<
 
   try {
     const ownerId = params.ownerId ?? (await getResearchOwner()).id;
-    const ticker = process.env.DEFAULT_RESEARCH_TICKER ?? "QQQ";
+    const ticker = process.env.DEFAULT_RESEARCH_TICKER ?? "NDX";
 
     await ingestTwelveDataDataset({
       ownerId,

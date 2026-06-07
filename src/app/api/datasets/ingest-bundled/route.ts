@@ -13,12 +13,12 @@ const bundledSchema = z.object({
 
 const bundledFiles = {
   "1min": {
-    file: "nasdaq-qqq-1min-ohlcv.csv",
-    name: "NASDAQ QQQ 1min Twelve Data OHLCV 2Y"
+    file: "nasdaq-ndx-1min-ohlcv.csv",
+    name: "Nasdaq 100 Index 1min Yahoo OHLCV"
   },
   "15min": {
-    file: "nasdaq-qqq-15min-ohlcv.csv",
-    name: "NASDAQ QQQ 15min Twelve Data OHLCV 2Y"
+    file: "nasdaq-ndx-15min-ohlcv.csv",
+    name: "Nasdaq 100 Index 15min Yahoo OHLCV"
   }
 } as const;
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     const dataset = await createDatasetFromCandles({
       ownerId: user.id,
-      ticker: "NASDAQ",
+      ticker: "^NDX",
       name: bundled.name,
       interval: body.interval,
       candles,
