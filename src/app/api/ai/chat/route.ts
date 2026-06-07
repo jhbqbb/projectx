@@ -103,6 +103,17 @@ async function getIctCalculations(question: string) {
     const focus = parseQuestionFocus(question);
     const maps = await Promise.all([
       getIctPatternMap({
+        interval: "5min",
+        session: focus.session,
+        mode: "reversal",
+        day: focus.day,
+        direction: focus.direction,
+        target: focus.target,
+        sweep: focus.sweep,
+        minN: 1,
+        minEdge: 0
+      }),
+      getIctPatternMap({
         interval: "15min",
         session: focus.session,
         mode: "reversal",
@@ -114,6 +125,7 @@ async function getIctCalculations(question: string) {
         minEdge: 0
       }),
       getIctPatternMap({ interval: "15min", session: "PM", mode: "reversal", minN: 10, minEdge: 48 }),
+      getIctPatternMap({ interval: "30min", session: "PM", mode: "reversal", minN: 5, minEdge: 48 }),
       getIctPatternMap({ interval: "1h", mode: "reversal", minN: 8, minEdge: 50 }),
       getIctPatternMap({ interval: "4h", mode: "reversal", minN: 3, minEdge: 50 })
     ]);

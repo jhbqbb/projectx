@@ -11,7 +11,8 @@ const PROVIDER = "Yahoo Finance chart endpoint";
 const DATA_DIR = path.join("public", "data");
 const VALIDATION_DIR = path.join(DATA_DIR, "validation");
 
-type Interval = "1min" | "15min" | "1h" | "4h";
+type SourceInterval = "1min" | "5min" | "15min" | "30min" | "1h" | "1d";
+type PatternInterval = "1min" | "5min" | "15min" | "30min" | "1h" | "4h";
 
 type YahooMeta = {
   symbol?: string;
@@ -51,15 +52,20 @@ type Candle = {
   volume: number;
 };
 
-const requests: Record<Exclude<Interval, "4h">, { range: string; interval: string }> = {
+const requests: Record<SourceInterval, { range: string; interval: string }> = {
   "1min": { range: "8d", interval: "1m" },
+  "5min": { range: "60d", interval: "5m" },
   "15min": { range: "60d", interval: "15m" },
-  "1h": { range: "730d", interval: "1h" }
+  "30min": { range: "60d", interval: "30m" },
+  "1h": { range: "730d", interval: "1h" },
+  "1d": { range: "max", interval: "1d" }
 };
 
-const regularSessionLastOpen: Record<Exclude<Interval, "4h">, string> = {
+const regularSessionLastOpen: Record<Exclude<SourceInterval, "1d">, string> = {
   "1min": "15:59",
+  "5min": "15:55",
   "15min": "15:45",
+  "30min": "15:30",
   "1h": "15:30"
 };
 const allowedHourlyOpens = new Set(["09:30", "10:30", "11:30", "12:30", "13:30", "14:30", "15:30"]);
@@ -76,7 +82,7 @@ function nyDate(value: Date) {
   return format(toZonedTime(value, NY_TIME_ZONE), "yyyy-MM-dd");
 }
 
-function isRegularSession(candle: Candle, interval: Exclude<Interval, "4h">) {
+function isRegularSession(candle: Candle, interval: Exclude<SourceInterval, "1d">) {
   const time = nyTime(candle.timestamp);
 
   if (interval === "1h") {
@@ -106,6 +112,45 @@ async function fetchYahoo(range: string, interval: string) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     PROVIDER_SYMBOL
   )}?range=${range}&interval=${interval}&includePrePost=false`;
+  const response = await fetch(url, { cache: "no-store" });
+  const payload = (await response.json()) as YahooChartPayload;
+
+  if (!response.ok || payload.chart?.error) {
+    throw new Error(payload.chart?.error?.description ?? `Yahoo returned ${response.status}.`);
+  }
+
+  const result = payload.chart?.result?.[0];
+  const quote = result?.indicators?.quote?.[0];
+
+  if (!result?.timestamp?.length || !quote) {
+    throw new Error(`Yahoo returned no ${interval} candles for ${PROVIDER_SYMBOL}.`);
+  }
+
+  const candles = result.timestamp
+    .map((timestamp, index) => ({
+      timestamp: new Date(timestamp * 1000),
+      open: Number(quote.open?.[index]),
+      high: Number(quote.high?.[index]),
+      low: Number(quote.low?.[index]),
+      close: Number(quote.close?.[index]),
+      volume: Number(quote.volume?.[index] ?? 0)
+    }))
+    .filter((candle) => [candle.open, candle.high, candle.low, candle.close].every(Number.isFinite))
+    .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+  return {
+    candles,
+    meta: result.meta,
+    url
+  };
+}
+
+async function fetchYahooPeriod(start: string, end: string, interval: string) {
+  const period1 = Math.floor(new Date(`${start}T00:00:00.000Z`).getTime() / 1000);
+  const period2 = Math.floor(new Date(`${end}T23:59:59.000Z`).getTime() / 1000);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+    PROVIDER_SYMBOL
+  )}?period1=${period1}&period2=${period2}&interval=${interval}&includePrePost=false`;
   const response = await fetch(url, { cache: "no-store" });
   const payload = (await response.json()) as YahooChartPayload;
 
@@ -183,7 +228,7 @@ function summarizeMeta(meta: YahooMeta | undefined) {
   };
 }
 
-function fileSummary(interval: Interval, candles: Candle[], derivedFrom?: string) {
+function fileSummary(interval: PatternInterval | "1d", candles: Candle[], derivedFrom?: string) {
   const file = `/data/nasdaq-${FILE_SYMBOL}-${interval}-ohlcv.csv`;
 
   return {
@@ -196,7 +241,7 @@ function fileSummary(interval: Interval, candles: Candle[], derivedFrom?: string
   };
 }
 
-function countOffSession(candles: Candle[], interval: Exclude<Interval, "4h">) {
+function countOffSession(candles: Candle[], interval: Exclude<SourceInterval, "1d">) {
   return candles.filter((candle) => !isRegularSession(candle, interval)).length;
 }
 
@@ -205,31 +250,42 @@ async function main() {
   await mkdir(VALIDATION_DIR, { recursive: true });
 
   const oneMinute = await fetchYahoo(requests["1min"].range, requests["1min"].interval);
+  const fiveMinute = await fetchYahoo(requests["5min"].range, requests["5min"].interval);
   const fifteenMinute = await fetchYahoo(requests["15min"].range, requests["15min"].interval);
+  const thirtyMinute = await fetchYahoo(requests["30min"].range, requests["30min"].interval);
   const hourly = await fetchYahoo(requests["1h"].range, requests["1h"].interval);
-  const daily = await fetchYahoo("5y", "1d");
+  const daily = await fetchYahooPeriod("1990-01-01", "2026-06-05", requests["1d"].interval);
 
   const candles = {
     "1min": oneMinute.candles.filter((candle) => isRegularSession(candle, "1min")),
+    "5min": fiveMinute.candles.filter((candle) => isRegularSession(candle, "5min")),
     "15min": fifteenMinute.candles.filter((candle) => isRegularSession(candle, "15min")),
+    "30min": thirtyMinute.candles.filter((candle) => isRegularSession(candle, "30min")),
     "1h": hourly.candles.filter((candle) => isRegularSession(candle, "1h")),
-    "4h": [] as Candle[]
+    "4h": [] as Candle[],
+    "1d": daily.candles
   };
   candles["4h"] = aggregate4h(candles["1h"]);
 
   await Promise.all([
     writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-1min-ohlcv.csv`), toCsv(candles["1min"]), "utf8"),
+    writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-5min-ohlcv.csv`), toCsv(candles["5min"]), "utf8"),
     writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-15min-ohlcv.csv`), toCsv(candles["15min"]), "utf8"),
+    writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-30min-ohlcv.csv`), toCsv(candles["30min"]), "utf8"),
     writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-1h-ohlcv.csv`), toCsv(candles["1h"]), "utf8"),
     writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-4h-ohlcv.csv`), toCsv(candles["4h"]), "utf8"),
-    writeFile(path.join(VALIDATION_DIR, `yahoo-${FILE_SYMBOL}-daily-5y.csv`), toCsv(daily.candles), "utf8")
+    writeFile(path.join(DATA_DIR, `nasdaq-${FILE_SYMBOL}-1d-ohlcv.csv`), toCsv(candles["1d"]), "utf8"),
+    writeFile(path.join(VALIDATION_DIR, `yahoo-${FILE_SYMBOL}-daily-max.csv`), toCsv(candles["1d"]), "utf8")
   ]);
 
   const files = [
     fileSummary("1min", candles["1min"]),
+    fileSummary("5min", candles["5min"]),
     fileSummary("15min", candles["15min"]),
+    fileSummary("30min", candles["30min"]),
     fileSummary("1h", candles["1h"]),
-    fileSummary("4h", candles["4h"], "1h")
+    fileSummary("4h", candles["4h"], "1h"),
+    fileSummary("1d", candles["1d"])
   ];
   const manifest = {
     source: PROVIDER,
@@ -266,9 +322,11 @@ async function main() {
     },
     sourceRequests: [
       { interval: "1min", requested: requests["1min"], meta: summarizeMeta(oneMinute.meta), rowsBeforeSessionFilter: oneMinute.candles.length, removedOffSessionRows: countOffSession(oneMinute.candles, "1min"), url: oneMinute.url },
+      { interval: "5min", requested: requests["5min"], meta: summarizeMeta(fiveMinute.meta), rowsBeforeSessionFilter: fiveMinute.candles.length, removedOffSessionRows: countOffSession(fiveMinute.candles, "5min"), url: fiveMinute.url },
       { interval: "15min", requested: requests["15min"], meta: summarizeMeta(fifteenMinute.meta), rowsBeforeSessionFilter: fifteenMinute.candles.length, removedOffSessionRows: countOffSession(fifteenMinute.candles, "15min"), url: fifteenMinute.url },
+      { interval: "30min", requested: requests["30min"], meta: summarizeMeta(thirtyMinute.meta), rowsBeforeSessionFilter: thirtyMinute.candles.length, removedOffSessionRows: countOffSession(thirtyMinute.candles, "30min"), url: thirtyMinute.url },
       { interval: "1h", requested: requests["1h"], meta: summarizeMeta(hourly.meta), rowsBeforeSessionFilter: hourly.candles.length, removedOffSessionRows: countOffSession(hourly.candles, "1h"), url: hourly.url },
-      { interval: "1d", requested: { range: "5y", interval: "1d" }, meta: summarizeMeta(daily.meta), rows: daily.candles.length, url: daily.url }
+      { interval: "1d", requested: { start: "1990-01-01", end: "2026-06-05", interval: requests["1d"].interval }, meta: summarizeMeta(daily.meta), rows: candles["1d"].length, url: daily.url }
     ],
     checks: {
       sourceIdentity: {
@@ -279,14 +337,18 @@ async function main() {
       },
       availableHistory: {
         oneMinuteRows: candles["1min"].length,
+        fiveMinuteRows: candles["5min"].length,
         fifteenMinuteRows: candles["15min"].length,
+        thirtyMinuteRows: candles["30min"].length,
         oneHourRows: candles["1h"].length,
         fourHourRows: candles["4h"].length,
-        dailyRows: daily.candles.length
+        dailyRows: candles["1d"].length
       },
       sessionFilter: {
         oneMinuteOffSessionRowsAfterFilter: countOffSession(candles["1min"], "1min"),
+        fiveMinuteOffSessionRowsAfterFilter: countOffSession(candles["5min"], "5min"),
         fifteenMinuteOffSessionRowsAfterFilter: countOffSession(candles["15min"], "15min"),
+        thirtyMinuteOffSessionRowsAfterFilter: countOffSession(candles["30min"], "30min"),
         oneHourOffSessionRowsAfterFilter: countOffSession(candles["1h"], "1h")
       }
     },
@@ -298,13 +360,20 @@ async function main() {
           "Twelve Data recognizes NDX but this API key is not on a plan that can fetch NDX intraday index candles."
       },
       {
+        provider: "Alpha Vantage",
+        status: "not_used",
+        reason:
+          "The current Alpha Vantage key is not entitled to NDX index data access."
+      },
+      {
         provider: "ETF proxy",
         status: "removed",
         reason: "ETF proxy data is not the Nasdaq index requested by the user."
       }
     ],
     notes: [
-      "Yahoo currently returns only recent 1-minute and 15-minute index intraday history. The platform does not invent older missing intraday bars.",
+      "Yahoo currently returns only recent 1-minute, 5-minute, 15-minute, and 30-minute index intraday history. The platform does not invent older missing intraday bars.",
+      "Daily Nasdaq 100 Index data is bundled back to 1990 for long-horizon context.",
       "4H candles are derived from real 1H Nasdaq 100 Index candles using 09:30 and 13:30 New York blocks.",
       "All displayed statistics are descriptive historical measurements, not causal proof or a trading guarantee."
     ]

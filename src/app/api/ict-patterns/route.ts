@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const session = params.get("session");
   const payload = await getIctPatternMap({
     mode: params.get("mode") === "continuation" ? "continuation" : "reversal",
-    interval: interval === "1h" || interval === "4h" ? interval : "15min",
+    interval: interval === "5min" || interval === "30min" || interval === "1h" || interval === "4h" ? interval : "15min",
     session: session === "AM" || session === "PM" ? session : "ALL",
     day: params.get("day") ?? "ALL",
     direction: direction === "HIGH" || direction === "LOW" ? direction : "BOTH",

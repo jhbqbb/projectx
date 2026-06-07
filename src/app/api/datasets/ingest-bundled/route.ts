@@ -8,7 +8,7 @@ import { createDatasetFromCandles } from "@/server/ingestion";
 import type { CandleInput } from "@/server/statistics";
 
 const bundledSchema = z.object({
-  interval: z.enum(["1min", "15min"]).default("15min")
+  interval: z.enum(["1min", "5min", "15min", "30min"]).default("15min")
 });
 
 const bundledFiles = {
@@ -16,9 +16,17 @@ const bundledFiles = {
     file: "nasdaq-ndx-1min-ohlcv.csv",
     name: "Nasdaq 100 Index 1min Yahoo OHLCV"
   },
+  "5min": {
+    file: "nasdaq-ndx-5min-ohlcv.csv",
+    name: "Nasdaq 100 Index 5min Yahoo OHLCV"
+  },
   "15min": {
     file: "nasdaq-ndx-15min-ohlcv.csv",
     name: "Nasdaq 100 Index 15min Yahoo OHLCV"
+  },
+  "30min": {
+    file: "nasdaq-ndx-30min-ohlcv.csv",
+    name: "Nasdaq 100 Index 30min Yahoo OHLCV"
   }
 } as const;
 

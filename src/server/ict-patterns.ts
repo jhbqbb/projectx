@@ -29,7 +29,7 @@ type IctCandle = {
 
 type SweepDirection = "HIGH" | "LOW";
 type PatternMode = "reversal" | "continuation";
-type IctInterval = "15min" | "1h" | "4h";
+type IctInterval = "5min" | "15min" | "30min" | "1h" | "4h";
 type IctSession = "ALL" | "AM" | "PM";
 
 export type IctPatternFilters = {
@@ -102,7 +102,9 @@ const cachedCandles = new Map<IctInterval, CachedCandles>();
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const intervalMeta: Record<IctInterval, { label: string; file: string }> = {
+  "5min": { label: "5M", file: "nasdaq-ndx-5min-ohlcv.csv" },
   "15min": { label: "15M", file: "nasdaq-ndx-15min-ohlcv.csv" },
+  "30min": { label: "30M", file: "nasdaq-ndx-30min-ohlcv.csv" },
   "1h": { label: "1H", file: "nasdaq-ndx-1h-ohlcv.csv" },
   "4h": { label: "4H", file: "nasdaq-ndx-4h-ohlcv.csv" }
 };
@@ -398,6 +400,13 @@ function addClockMinutes(time: string, minutes: number) {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
+const intervalMinutes: Record<Exclude<IctInterval, "4h">, number> = {
+  "5min": 5,
+  "15min": 15,
+  "30min": 30,
+  "1h": 60
+};
+
 function displayAvailableEnd(candles: IctCandle[], interval: IctInterval) {
   const latest = candles.reduce((value, candle) => (candle.time > value ? candle.time : value), "");
 
@@ -415,11 +424,13 @@ function displayAvailableEnd(candles: IctCandle[], interval: IctInterval) {
     return "12:00";
   }
 
-  return interval === "15min" ? addClockMinutes(latest, 15) : latest;
+  return interval === "4h" ? latest : addClockMinutes(latest, intervalMinutes[interval]);
 }
 
 function normalizeInterval(interval?: string): IctInterval {
-  return interval === "1h" || interval === "4h" ? interval : "15min";
+  return interval === "5min" || interval === "30min" || interval === "1h" || interval === "4h"
+    ? interval
+    : "15min";
 }
 
 function normalizeSession(session?: string): IctSession {

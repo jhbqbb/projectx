@@ -17,12 +17,28 @@ const bundledFiles = [
     ingestInterval: "1min"
   },
   {
+    interval: "5min",
+    label: "Nasdaq 100 Index 5 minute",
+    url: "/data/nasdaq-ndx-5min-ohlcv.csv",
+    rows: "4,680",
+    coverage: "2026-03-12 to 2026-06-05",
+    ingestInterval: "5min"
+  },
+  {
     interval: "15min",
     label: "Nasdaq 100 Index 15 minute",
     url: "/data/nasdaq-ndx-15min-ohlcv.csv",
     rows: "1,560",
     coverage: "2026-03-12 to 2026-06-05",
     ingestInterval: "15min"
+  },
+  {
+    interval: "30min",
+    label: "Nasdaq 100 Index 30 minute",
+    url: "/data/nasdaq-ndx-30min-ohlcv.csv",
+    rows: "780",
+    coverage: "2026-03-12 to 2026-06-05",
+    ingestInterval: "30min"
   },
   {
     interval: "1h",
@@ -38,6 +54,14 @@ const bundledFiles = [
     url: "/data/nasdaq-ndx-4h-ohlcv.csv",
     rows: "1,453",
     coverage: "2023-07-11 to 2026-06-05",
+    ingestInterval: null
+  },
+  {
+    interval: "1d",
+    label: "Nasdaq 100 Index daily",
+    url: "/data/nasdaq-ndx-1d-ohlcv.csv",
+    rows: "9,174",
+    coverage: "1990-01-02 to 2026-06-05",
     ingestInterval: null
   }
 ] as const;
@@ -191,7 +215,7 @@ export function IngestionForm() {
       <div className="md:col-span-2 rounded-md border border-white/10 bg-black/20 p-3">
         <div className="text-sm font-medium">Bundled real OHLCV files</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">
-          Static Nasdaq 100 Index files are available without provider env vars. Pattern Explorer and AI read the 15M, 1H, and 4H files directly; PostgreSQL session ingestion supports the 1M and 15M files.
+          Static Nasdaq 100 Index files are available without provider env vars. Pattern Explorer and AI read the 5M, 15M, 30M, 1H, and 4H files directly; PostgreSQL session ingestion supports the 1M, 5M, 15M, and 30M files.
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {bundledFiles.map((file) => (

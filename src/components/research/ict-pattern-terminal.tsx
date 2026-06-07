@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 type PatternMode = "reversal" | "continuation";
 type SweepDirection = "BOTH" | "HIGH" | "LOW";
-type IctInterval = "15min" | "1h" | "4h";
+type IctInterval = "5min" | "15min" | "30min" | "1h" | "4h";
 type IctSession = "ALL" | "AM" | "PM";
 type LookupMode = "exact" | "loose" | "situational" | "custom";
 
@@ -120,7 +120,9 @@ type DataAudit = {
     };
     availableHistory?: {
       oneMinuteRows?: number;
+      fiveMinuteRows?: number;
       fifteenMinuteRows?: number;
+      thirtyMinuteRows?: number;
       oneHourRows?: number;
       fourHourRows?: number;
       dailyRows?: number;
@@ -135,7 +137,9 @@ type DataAudit = {
 
 const days = ["ALL", "MON", "TUE", "WED", "THU", "FRI"];
 const timeframes: Array<{ value: IctInterval; label: string; description: string }> = [
+  { value: "5min", label: "5M", description: "fine intraday sweep map" },
   { value: "15min", label: "15M", description: "intraday sweep map" },
+  { value: "30min", label: "30M", description: "session structure map" },
   { value: "1h", label: "1H", description: "hourly reaction map" },
   { value: "4h", label: "4H", description: "macro reaction map" }
 ];
@@ -171,36 +175,28 @@ function toIsoDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function clockFromMinutes(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function makeTimes(step: number, lastOpen: string) {
+  const [lastHour, lastMinute] = lastOpen.split(":").map(Number);
+  const start = 9 * 60 + 30;
+  const end = lastHour * 60 + lastMinute;
+  const times: string[] = [];
+
+  for (let minute = start; minute <= end; minute += step) {
+    times.push(clockFromMinutes(minute));
+  }
+
+  return times;
+}
+
 function buildTimeOptions(interval: IctInterval, session: IctSession) {
   const intervalTimes = {
-    "15min": [
-      "09:30",
-      "09:45",
-      "10:00",
-      "10:15",
-      "10:30",
-      "10:45",
-      "11:00",
-      "11:15",
-      "11:30",
-      "11:45",
-      "12:00",
-      "12:15",
-      "12:30",
-      "12:45",
-      "13:00",
-      "13:15",
-      "13:30",
-      "13:45",
-      "14:00",
-      "14:15",
-      "14:30",
-      "14:45",
-      "15:00",
-      "15:15",
-      "15:30",
-      "15:45"
-    ],
+    "5min": makeTimes(5, "15:55"),
+    "15min": makeTimes(15, "15:45"),
+    "30min": makeTimes(30, "15:30"),
     "1h": ["09:30", "10:30", "11:30", "12:30", "13:30", "14:30", "15:30"],
     "4h": ["09:30", "13:30"]
   } satisfies Record<IctInterval, string[]>;
@@ -719,8 +715,9 @@ export function IctPatternTerminal() {
                 {audit?.checks?.sourceIdentity?.fullExchangeName ?? "Nasdaq GIDS"}
               </div>
               <div>
-                Clean session rows: {formatCount(audit?.checks?.availableHistory?.fifteenMinuteRows ?? 0)} 15M /{" "}
-                {formatCount(audit?.checks?.availableHistory?.oneHourRows ?? 0)} 1H
+                Rows: {formatCount(audit?.checks?.availableHistory?.fiveMinuteRows ?? 0)} 5M /{" "}
+                {formatCount(audit?.checks?.availableHistory?.thirtyMinuteRows ?? 0)} 30M /{" "}
+                {formatCount(audit?.checks?.availableHistory?.dailyRows ?? 0)} 1D
               </div>
             </div>
           </div>

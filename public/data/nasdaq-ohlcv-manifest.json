@@ -26,11 +26,25 @@
       "to": "2026-06-05T19:59:00.000Z"
     },
     {
+      "interval": "5min",
+      "url": "/data/nasdaq-ndx-5min-ohlcv.csv",
+      "rows": 4680,
+      "from": "2026-03-12T13:30:00.000Z",
+      "to": "2026-06-05T19:55:00.000Z"
+    },
+    {
       "interval": "15min",
       "url": "/data/nasdaq-ndx-15min-ohlcv.csv",
       "rows": 1560,
       "from": "2026-03-12T13:30:00.000Z",
       "to": "2026-06-05T19:45:00.000Z"
+    },
+    {
+      "interval": "30min",
+      "url": "/data/nasdaq-ndx-30min-ohlcv.csv",
+      "rows": 780,
+      "from": "2026-03-12T13:30:00.000Z",
+      "to": "2026-06-05T19:30:00.000Z"
     },
     {
       "interval": "1h",
@@ -46,6 +60,13 @@
       "from": "2023-07-11T13:30:00.000Z",
       "to": "2026-06-05T17:30:00.000Z",
       "derivedFrom": "1h"
+    },
+    {
+      "interval": "1d",
+      "url": "/data/nasdaq-ndx-1d-ohlcv.csv",
+      "rows": 9174,
+      "from": "1990-01-02T14:30:00.000Z",
+      "to": "2026-06-05T13:30:00.000Z"
     }
   ]
 }
