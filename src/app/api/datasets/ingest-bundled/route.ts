@@ -14,19 +14,19 @@ const bundledSchema = z.object({
 const bundledFiles = {
   "1min": {
     file: "nasdaq-ndx-1min-ohlcv.csv",
-    name: "Nasdaq 100 Index 1min Yahoo OHLCV"
+    name: "Nasdaq 100 Index 1min OHLCV"
   },
   "5min": {
     file: "nasdaq-ndx-5min-ohlcv.csv",
-    name: "Nasdaq 100 Index 5min Yahoo OHLCV"
+    name: "Nasdaq 100 Index 5min OHLCV"
   },
   "15min": {
     file: "nasdaq-ndx-15min-ohlcv.csv",
-    name: "Nasdaq 100 Index 15min Yahoo OHLCV"
+    name: "Nasdaq 100 Index 15min OHLCV"
   },
   "30min": {
     file: "nasdaq-ndx-30min-ohlcv.csv",
-    name: "Nasdaq 100 Index 30min Yahoo OHLCV"
+    name: "Nasdaq 100 Index 30min OHLCV"
   }
 } as const;
 

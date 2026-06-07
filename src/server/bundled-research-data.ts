@@ -113,7 +113,7 @@ export async function getBundledResearchSnapshot(): Promise<AnalyticsSnapshot> {
     hasData: true,
     dataset: {
       id: "bundled-nasdaq-ndx-15min",
-      name: "Bundled Nasdaq 100 Index 15min Yahoo OHLCV",
+      name: "Bundled Nasdaq 100 Index 15min OHLCV",
       ticker: "^NDX",
       source: "BUNDLED_YAHOO_INDEX",
       interval: "FIFTEEN_MINUTES",

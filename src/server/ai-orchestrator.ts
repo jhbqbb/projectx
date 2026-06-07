@@ -115,7 +115,7 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
     return [
       `I analyzed the bundled real Nasdaq 100 Index ICT sweep maps for: "${question}".`,
       "",
-      "Source: Yahoo Finance chart endpoint for ^NDX, bundled in the website. All timestamps are converted to America/New_York.",
+      "Source: Yahoo Finance chart endpoint for current/daily ^NDX plus FirstRate Data free NDX intraday sample, bundled in the website. All timestamps are converted to America/New_York.",
       "",
       ...context.ictCalculations.slice(0, 12),
       "",

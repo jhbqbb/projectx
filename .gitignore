@@ -9,6 +9,7 @@ out
 dist
 coverage
 .postgres-data
+tmp
 
 *.log
 npm-debug.log*

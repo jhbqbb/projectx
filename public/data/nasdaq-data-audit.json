@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-06-07T13:05:06.183Z",
+  "generatedAt": "2026-06-07T14:51:47.332Z",
   "status": "verified",
   "displayedStatsUseFallbacks": false,
-  "statement": "Displayed ICT statistics are calculated from real Nasdaq 100 Index (^NDX) OHLCV candles from Yahoo Finance chart data. ETF proxy data is not used for displayed index statistics.",
+  "statement": "Displayed ICT statistics are calculated from real Nasdaq 100 Index (^NDX/NDX) OHLCV candles from Yahoo Finance chart data plus the FirstRate Data free NDX intraday sample. ETF proxy data is not used for displayed index statistics.",
   "primarySource": {
-    "provider": "Yahoo Finance chart endpoint",
+    "provider": "Yahoo Finance chart endpoint + FirstRate Data free NDX intraday sample",
     "instrumentName": "Nasdaq 100 Index",
     "symbol": "^NDX",
     "exchange": "Nasdaq GIDS",
@@ -15,43 +15,47 @@
       {
         "interval": "1min",
         "url": "/data/nasdaq-ndx-1min-ohlcv.csv",
-        "rows": 3120,
-        "from": "2026-05-27T13:30:00.000Z",
+        "rows": 100804,
+        "from": "2022-09-30T13:30:00.000Z",
         "to": "2026-06-05T19:59:00.000Z"
       },
       {
         "interval": "5min",
         "url": "/data/nasdaq-ndx-5min-ohlcv.csv",
-        "rows": 4680,
-        "from": "2026-03-12T13:30:00.000Z",
-        "to": "2026-06-05T19:55:00.000Z"
+        "rows": 24218,
+        "from": "2022-09-30T13:30:00.000Z",
+        "to": "2026-06-05T19:55:00.000Z",
+        "derivedFrom": "1min + Yahoo 5min"
       },
       {
         "interval": "15min",
         "url": "/data/nasdaq-ndx-15min-ohlcv.csv",
-        "rows": 1560,
-        "from": "2026-03-12T13:30:00.000Z",
-        "to": "2026-06-05T19:45:00.000Z"
+        "rows": 8074,
+        "from": "2022-09-30T13:30:00.000Z",
+        "to": "2026-06-05T19:45:00.000Z",
+        "derivedFrom": "1min + Yahoo 15min"
       },
       {
         "interval": "30min",
         "url": "/data/nasdaq-ndx-30min-ohlcv.csv",
-        "rows": 780,
-        "from": "2026-03-12T13:30:00.000Z",
-        "to": "2026-06-05T19:30:00.000Z"
+        "rows": 4037,
+        "from": "2022-09-30T13:30:00.000Z",
+        "to": "2026-06-05T19:30:00.000Z",
+        "derivedFrom": "1min + Yahoo 30min"
       },
       {
         "interval": "1h",
         "url": "/data/nasdaq-ndx-1h-ohlcv.csv",
-        "rows": 5089,
-        "from": "2023-07-11T13:30:00.000Z",
-        "to": "2026-06-05T19:30:00.000Z"
+        "rows": 6436,
+        "from": "2022-09-30T13:30:00.000Z",
+        "to": "2026-06-05T19:30:00.000Z",
+        "derivedFrom": "1min + Yahoo 1h"
       },
       {
         "interval": "4h",
         "url": "/data/nasdaq-ndx-4h-ohlcv.csv",
-        "rows": 1453,
-        "from": "2023-07-11T13:30:00.000Z",
+        "rows": 1839,
+        "from": "2022-09-30T13:30:00.000Z",
         "to": "2026-06-05T17:30:00.000Z",
         "derivedFrom": "1h"
       },
@@ -66,135 +70,93 @@
   },
   "sourceRequests": [
     {
+      "provider": "FirstRate Data",
+      "url": "https://frd001.s3-us-east-2.amazonaws.com/NDX_1min_sample_firstratedata.zip",
       "interval": "1min",
-      "requested": {
-        "range": "8d",
-        "interval": "1m"
-      },
-      "meta": {
-        "symbol": "^NDX",
-        "exchangeName": "NIM",
-        "fullExchangeName": "Nasdaq GIDS",
-        "instrumentType": "INDEX",
-        "exchangeTimezoneName": "America/New_York",
-        "range": "8d",
-        "dataGranularity": "1m"
-      },
-      "rowsBeforeSessionFilter": 3121,
-      "removedOffSessionRows": 1,
-      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5ENDX?range=8d&interval=1m&includePrePost=false"
+      "timezone": "US Eastern / America/New_York",
+      "note": "Free NDX intraday sample downloaded and converted from New York local timestamps to UTC ISO timestamps.",
+      "rows": 97684,
+      "from": "2022-09-30T13:30:00.000Z",
+      "to": "2023-09-29T19:59:00.000Z",
+      "tradingDays": 251
     },
     {
-      "interval": "5min",
-      "requested": {
-        "range": "60d",
-        "interval": "5m"
-      },
-      "meta": {
-        "symbol": "^NDX",
-        "exchangeName": "NIM",
-        "fullExchangeName": "Nasdaq GIDS",
-        "instrumentType": "INDEX",
-        "exchangeTimezoneName": "America/New_York",
-        "range": "60d",
-        "dataGranularity": "5m"
-      },
-      "rowsBeforeSessionFilter": 4681,
-      "removedOffSessionRows": 1,
-      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5ENDX?range=60d&interval=5m&includePrePost=false"
-    },
-    {
-      "interval": "15min",
-      "requested": {
-        "range": "60d",
-        "interval": "15m"
-      },
-      "meta": {
-        "symbol": "^NDX",
-        "exchangeName": "NIM",
-        "fullExchangeName": "Nasdaq GIDS",
-        "instrumentType": "INDEX",
-        "exchangeTimezoneName": "America/New_York",
-        "range": "60d",
-        "dataGranularity": "15m"
-      },
-      "rowsBeforeSessionFilter": 1561,
-      "removedOffSessionRows": 1,
-      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5ENDX?range=60d&interval=15m&includePrePost=false"
-    },
-    {
-      "interval": "30min",
-      "requested": {
-        "range": "60d",
-        "interval": "30m"
-      },
-      "meta": {
-        "symbol": "^NDX",
-        "exchangeName": "NIM",
-        "fullExchangeName": "Nasdaq GIDS",
-        "instrumentType": "INDEX",
-        "exchangeTimezoneName": "America/New_York",
-        "range": "60d",
-        "dataGranularity": "30m"
-      },
-      "rowsBeforeSessionFilter": 781,
-      "removedOffSessionRows": 1,
-      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5ENDX?range=60d&interval=30m&includePrePost=false"
-    },
-    {
-      "interval": "1h",
-      "requested": {
-        "range": "730d",
-        "interval": "1h"
-      },
-      "meta": {
-        "symbol": "^NDX",
-        "exchangeName": "NIM",
-        "fullExchangeName": "Nasdaq GIDS",
-        "instrumentType": "INDEX",
-        "exchangeTimezoneName": "America/New_York",
-        "range": "730d",
-        "dataGranularity": "1h"
-      },
-      "rowsBeforeSessionFilter": 5097,
-      "removedOffSessionRows": 8,
-      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5ENDX?range=730d&interval=1h&includePrePost=false"
-    },
-    {
-      "interval": "1d",
-      "requested": {
-        "start": "1990-01-01",
-        "end": "2026-06-05",
-        "interval": "1d"
-      },
-      "meta": {
-        "symbol": "^NDX",
-        "exchangeName": "NIM",
-        "fullExchangeName": "Nasdaq GIDS",
-        "instrumentType": "INDEX",
-        "exchangeTimezoneName": "America/New_York",
-        "range": "",
-        "dataGranularity": "1d"
-      },
-      "rows": 9174,
-      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5ENDX?period1=631152000&period2=1780703999&interval=1d&includePrePost=false"
+      "provider": "Yahoo Finance chart endpoint",
+      "symbol": "^NDX",
+      "note": "Existing bundled Yahoo index files retained and merged where Yahoo has newer available history.",
+      "files": {
+        "1min": {
+          "rows": 3120,
+          "from": "2026-05-27T13:30:00.000Z",
+          "to": "2026-06-05T19:59:00.000Z",
+          "tradingDays": 8
+        },
+        "5min": {
+          "rows": 4680,
+          "from": "2026-03-12T13:30:00.000Z",
+          "to": "2026-06-05T19:55:00.000Z",
+          "tradingDays": 60
+        },
+        "15min": {
+          "rows": 1560,
+          "from": "2026-03-12T13:30:00.000Z",
+          "to": "2026-06-05T19:45:00.000Z",
+          "tradingDays": 60
+        },
+        "30min": {
+          "rows": 780,
+          "from": "2026-03-12T13:30:00.000Z",
+          "to": "2026-06-05T19:30:00.000Z",
+          "tradingDays": 60
+        },
+        "1h": {
+          "rows": 5089,
+          "from": "2023-07-11T13:30:00.000Z",
+          "to": "2026-06-05T19:30:00.000Z",
+          "tradingDays": 730
+        },
+        "1d": {
+          "rows": 9174,
+          "from": "1990-01-02T14:30:00.000Z",
+          "to": "2026-06-05T13:30:00.000Z",
+          "tradingDays": 9174
+        }
+      }
     }
   ],
   "checks": {
     "sourceIdentity": {
       "symbol": "^NDX",
+      "alternateVendorSymbol": "NDX",
       "fullExchangeName": "Nasdaq GIDS",
       "instrumentType": "INDEX",
       "timezone": "America/New_York"
     },
     "availableHistory": {
-      "oneMinuteRows": 3120,
-      "fiveMinuteRows": 4680,
-      "fifteenMinuteRows": 1560,
-      "thirtyMinuteRows": 780,
-      "oneHourRows": 5089,
-      "fourHourRows": 1453,
+      "oneMinuteRows": 100804,
+      "fiveMinuteRows": 24218,
+      "fifteenMinuteRows": 8074,
+      "thirtyMinuteRows": 4037,
+      "oneHourRows": 6436,
+      "fourHourRows": 1839,
       "dailyRows": 9174
+    },
+    "providerCoverage": {
+      "firstRate": {
+        "oneMinuteRows": 97684,
+        "fiveMinuteRows": 19538,
+        "fifteenMinuteRows": 6514,
+        "thirtyMinuteRows": 3257,
+        "oneHourRows": 1753
+      },
+      "yahoo": {
+        "oneMinuteRows": 3120,
+        "fiveMinuteRows": 4680,
+        "fifteenMinuteRows": 1560,
+        "thirtyMinuteRows": 780,
+        "oneHourRows": 5089,
+        "dailyRows": 9174
+      }
     },
     "sessionFilter": {
       "oneMinuteOffSessionRowsAfterFilter": 0,
@@ -208,12 +170,12 @@
     {
       "provider": "Twelve Data",
       "status": "not_used",
-      "reason": "Twelve Data recognizes NDX but this API key is not on a plan that can fetch NDX intraday index candles."
+      "reason": "Twelve Data recognizes NDX but this API key is not on a plan that can fetch expanded NDX intraday index candles."
     },
     {
       "provider": "Alpha Vantage",
       "status": "not_used",
-      "reason": "The current Alpha Vantage key is not entitled to NDX index data access."
+      "reason": "The current Alpha Vantage key is not entitled to expanded NDX index intraday access."
     },
     {
       "provider": "ETF proxy",
@@ -222,8 +184,9 @@
     }
   ],
   "notes": [
-    "Yahoo currently returns only recent 1-minute, 5-minute, 15-minute, and 30-minute index intraday history. The platform does not invent older missing intraday bars.",
-    "Daily Nasdaq 100 Index data is bundled back to 1990 for long-horizon context.",
+    "FirstRate Data free NDX sample adds one year of 1-minute Nasdaq 100 Index bars from 2022-09-30 through 2023-09-29 in New York time.",
+    "Yahoo Finance chart data provides the current recent intraday windows and all-time daily Nasdaq 100 Index history.",
+    "5M, 15M, 30M, 1H, and 4H files are rebuilt from real NDX OHLCV candles; no synthetic fallback prices or QQQ proxy data are used.",
     "4H candles are derived from real 1H Nasdaq 100 Index candles using 09:30 and 13:30 New York blocks.",
     "All displayed statistics are descriptive historical measurements, not causal proof or a trading guarantee."
   ]

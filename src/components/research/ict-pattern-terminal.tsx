@@ -752,7 +752,8 @@ export function IctPatternTerminal() {
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// DATE RANGE"}</div>
               <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#6f8f99]">
-                {activeInterval?.label} - {activeInterval?.description} - {activeSession?.description} - source {data?.meta.provider ?? "Yahoo Finance chart endpoint"}
+                {activeInterval?.label} - {activeInterval?.description} - {activeSession?.description} - source{" "}
+                {data?.meta.provider ?? "Yahoo Finance + FirstRate Data"}
               </div>
             </div>
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#86a4ac]">

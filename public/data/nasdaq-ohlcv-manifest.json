@@ -1,5 +1,5 @@
 {
-  "source": "Yahoo Finance chart endpoint",
+  "source": "Yahoo Finance chart endpoint + FirstRate Data free NDX intraday sample",
   "platformTicker": "NASDAQ_INDEX",
   "instrumentName": "Nasdaq 100 Index",
   "providerSymbol": "^NDX",
@@ -21,43 +21,47 @@
     {
       "interval": "1min",
       "url": "/data/nasdaq-ndx-1min-ohlcv.csv",
-      "rows": 3120,
-      "from": "2026-05-27T13:30:00.000Z",
+      "rows": 100804,
+      "from": "2022-09-30T13:30:00.000Z",
       "to": "2026-06-05T19:59:00.000Z"
     },
     {
       "interval": "5min",
       "url": "/data/nasdaq-ndx-5min-ohlcv.csv",
-      "rows": 4680,
-      "from": "2026-03-12T13:30:00.000Z",
-      "to": "2026-06-05T19:55:00.000Z"
+      "rows": 24218,
+      "from": "2022-09-30T13:30:00.000Z",
+      "to": "2026-06-05T19:55:00.000Z",
+      "derivedFrom": "1min + Yahoo 5min"
     },
     {
       "interval": "15min",
       "url": "/data/nasdaq-ndx-15min-ohlcv.csv",
-      "rows": 1560,
-      "from": "2026-03-12T13:30:00.000Z",
-      "to": "2026-06-05T19:45:00.000Z"
+      "rows": 8074,
+      "from": "2022-09-30T13:30:00.000Z",
+      "to": "2026-06-05T19:45:00.000Z",
+      "derivedFrom": "1min + Yahoo 15min"
     },
     {
       "interval": "30min",
       "url": "/data/nasdaq-ndx-30min-ohlcv.csv",
-      "rows": 780,
-      "from": "2026-03-12T13:30:00.000Z",
-      "to": "2026-06-05T19:30:00.000Z"
+      "rows": 4037,
+      "from": "2022-09-30T13:30:00.000Z",
+      "to": "2026-06-05T19:30:00.000Z",
+      "derivedFrom": "1min + Yahoo 30min"
     },
     {
       "interval": "1h",
       "url": "/data/nasdaq-ndx-1h-ohlcv.csv",
-      "rows": 5089,
-      "from": "2023-07-11T13:30:00.000Z",
-      "to": "2026-06-05T19:30:00.000Z"
+      "rows": 6436,
+      "from": "2022-09-30T13:30:00.000Z",
+      "to": "2026-06-05T19:30:00.000Z",
+      "derivedFrom": "1min + Yahoo 1h"
     },
     {
       "interval": "4h",
       "url": "/data/nasdaq-ndx-4h-ohlcv.csv",
-      "rows": 1453,
-      "from": "2023-07-11T13:30:00.000Z",
+      "rows": 1839,
+      "from": "2022-09-30T13:30:00.000Z",
       "to": "2026-06-05T17:30:00.000Z",
       "derivedFrom": "1h"
     },

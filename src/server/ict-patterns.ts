@@ -495,7 +495,7 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
       totalCandles: sessionCandles.length,
       tradingDays: groupByDate(sessionCandles).length,
       sweepEvents: allEvents,
-      provider: "Yahoo Finance chart endpoint",
+      provider: "Yahoo Finance chart endpoint + FirstRate Data free NDX intraday sample",
       symbol: "^NDX",
       exchange: "Nasdaq GIDS",
       micCode: "NIM"

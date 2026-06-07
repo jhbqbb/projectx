@@ -76,7 +76,9 @@ function parseQuestionFocus(question: string) {
     .filter((time): time is string => Boolean(time));
   const target = timeMatches[0] ?? "ALL";
   const sweep = timeMatches[1] ?? "ALL";
-  const session = lower.includes("pm") || lower.includes("afternoon") || (target !== "ALL" && target >= "12:00") ? "PM" : "ALL";
+  const asksPm = /(?:\bpm\b|\bp\.m\.?\b)/.test(lower) || lower.includes("afternoon");
+  const asksAm = /(?:\bam\b|\ba\.m\.?\b)/.test(lower) || lower.includes("morning");
+  const session = asksPm || (target !== "ALL" && target >= "12:00") ? "PM" : asksAm ? "AM" : "ALL";
 
   return { day, direction, target, sweep, session } as const;
 }
@@ -110,6 +112,13 @@ function plainDailySweepLine(prefix: string, row: Awaited<ReturnType<typeof getD
     .replace("(accept below PDL)", "accept below previous daily low");
 
   return `${prefix} ${row.day} ${row.sweep} ${level} sweep: ${row.edge}% ${mode} read. Bias: ${bias}. Sweep frequency ${row.frequency}%, average depth ${row.depth} points, rejection ${row.rejection} points. Evidence: ${evidenceLabel(row.n)}.`;
+}
+
+function evidenceRows<T extends { n: number; edge: number; frequency: number }>(rows: T[]) {
+  const usable = rows.filter((row) => row.n >= 10);
+  const source = usable.length ? usable : rows;
+
+  return [...source].sort((a, b) => b.edge - a.edge || b.n - a.n || b.frequency - a.frequency).slice(0, 3);
 }
 
 async function getIctCalculations(question: string) {
@@ -164,7 +173,26 @@ async function getIctCalculations(question: string) {
         minN: 1,
         minEdge: 0
       }),
-      getDailySweepMap({ interval: "1h", session: "PM", mode: "reversal", minN: 5, minEdge: 45 })
+      getDailySweepMap({
+        interval: "1h",
+        session: focus.session,
+        mode: "reversal",
+        day: focus.day,
+        direction: focus.direction,
+        sweep: focus.sweep,
+        minN: 1,
+        minEdge: 0
+      }),
+      getDailySweepMap({
+        interval: "4h",
+        session: focus.session,
+        mode: "reversal",
+        day: focus.day,
+        direction: focus.direction,
+        sweep: focus.sweep,
+        minN: 1,
+        minEdge: 0
+      })
     ]);
 
     return [
@@ -173,14 +201,14 @@ async function getIctCalculations(question: string) {
       ...maps.flatMap((map) => [
         `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} to ${map.meta.to}, all times America/New_York. Available intraday bars in this file currently run through ${map.meta.availableEnd || "the regular close"}.`,
         `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel} overall reversal read: ${map.summary.weightedEdge}%.`,
-        ...map.rows.slice(0, 3).map(
+        ...evidenceRows(map.rows).map(
           (row) => plainRowLine(`ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
         )
       ]),
       ...dailyMaps.flatMap((map) => [
         `Daily levels ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}, intraday ${map.meta.from} to ${map.meta.to}; all-time daily file ${map.meta.dailyFrom} to ${map.meta.dailyTo}.`,
         `All-time daily levels: previous daily high swept ${map.dailySummary.highSweepFrequency}%, previous daily low swept ${map.dailySummary.lowSweepFrequency}%, both sides swept ${map.dailySummary.bothSidesFrequency}%.`,
-        ...map.rows.slice(0, 3).map(
+        ...evidenceRows(map.rows).map(
           (row) => plainDailySweepLine(`Daily levels ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
         )
       ])

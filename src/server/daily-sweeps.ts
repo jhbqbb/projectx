@@ -556,7 +556,7 @@ export async function getDailySweepMap(filters: DailySweepFilters = {}) {
       dailyTo: daily.to,
       intradayTradingDays: groupByDate(intradayCandles).length,
       dailyTradingDays: daily.candles.length,
-      provider: "Yahoo Finance chart endpoint",
+      provider: "Yahoo Finance chart endpoint + FirstRate Data free NDX intraday sample",
       symbol: "^NDX",
       exchange: "Nasdaq GIDS"
     },
