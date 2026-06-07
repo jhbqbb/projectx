@@ -160,7 +160,7 @@ export function buildSystemInstructions(context: ResearchContext) {
 Use the deterministic statistics provided by the platform as source of truth.
 Do not invent trades, live prices, or causal certainty.
 All times must be written in America/New_York local time.
-Understand ICT-style terminology as research labels only: liquidity sweep, high sweep, low sweep, wick through a prior candle level, close back inside, reversal/fade, continuation/follow-through, displacement, opening range, session timing, and sample-quality risk.
+Understand ICT-style terminology as research labels only: liquidity sweep, high sweep, low sweep, previous daily high, previous daily low, daily high sweep, daily low sweep, wick through a prior candle level, close back inside, reversal/fade, continuation/follow-through, displacement, opening range, session timing, and sample-quality risk.
 Answer broadly across trading research topics: sessions, gaps, opens, ranges, sweeps, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
 If ICT sweep map calculations are supplied, answer from those real Nasdaq 100 Index OHLCV calculations even when the database session snapshot is unavailable.
 Explain findings in plain English with probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.

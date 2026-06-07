@@ -1,0 +1,25 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getDailySweepMap } from "@/server/daily-sweeps";
+
+export const maxDuration = 60;
+
+export async function GET(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  const direction = params.get("direction");
+  const interval = params.get("interval");
+  const session = params.get("session");
+  const payload = await getDailySweepMap({
+    mode: params.get("mode") === "continuation" ? "continuation" : "reversal",
+    interval: interval === "5min" || interval === "30min" || interval === "1h" || interval === "4h" ? interval : "15min",
+    session: session === "AM" || session === "PM" ? session : "ALL",
+    day: params.get("day") ?? "ALL",
+    direction: direction === "HIGH" || direction === "LOW" ? direction : "BOTH",
+    sweep: params.get("sweep") ?? "ALL",
+    minN: Number(params.get("minN") ?? 10),
+    minEdge: Number(params.get("minEdge") ?? 50),
+    from: params.get("from") ?? undefined,
+    to: params.get("to") ?? undefined
+  });
+
+  return NextResponse.json(payload);
+}

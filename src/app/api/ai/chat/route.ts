@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { buildResearchContext, buildSystemInstructions, createFallbackAnswer, getOpenAIClient } from "@/server/ai-orchestrator";
+import { getDailySweepMap } from "@/server/daily-sweeps";
 import { getIctPatternMap } from "@/server/ict-patterns";
 import { getResearchSnapshot } from "@/server/research-snapshot";
 
@@ -98,6 +99,19 @@ function plainRowLine(prefix: string, row: Awaited<ReturnType<typeof getIctPatte
   return `${prefix} ${row.day} ${row.target} to ${row.sweep} ${direction}: ${row.edge}% ${mode} read. Bias: ${bias}. Average sweep depth ${row.depth} points and rejection ${row.rejection} points. Evidence: ${evidenceLabel(row.n)}.`;
 }
 
+function plainDailySweepLine(prefix: string, row: Awaited<ReturnType<typeof getDailySweepMap>>["rows"][number], mode: string) {
+  const level = row.level === "PDH" ? "previous daily high" : "previous daily low";
+  const bias = row.trade
+    .replace("LONG", "long")
+    .replace("SHORT", "short")
+    .replace("(fade PDH)", "fade previous daily high")
+    .replace("(fade PDL)", "fade previous daily low")
+    .replace("(accept above PDH)", "accept above previous daily high")
+    .replace("(accept below PDL)", "accept below previous daily low");
+
+  return `${prefix} ${row.day} ${row.sweep} ${level} sweep: ${row.edge}% ${mode} read. Bias: ${bias}. Sweep frequency ${row.frequency}%, average depth ${row.depth} points, rejection ${row.rejection} points. Evidence: ${evidenceLabel(row.n)}.`;
+}
+
 async function getIctCalculations(question: string) {
   try {
     const focus = parseQuestionFocus(question);
@@ -129,14 +143,45 @@ async function getIctCalculations(question: string) {
       getIctPatternMap({ interval: "1h", mode: "reversal", minN: 8, minEdge: 50 }),
       getIctPatternMap({ interval: "4h", mode: "reversal", minN: 3, minEdge: 50 })
     ]);
+    const dailyMaps = await Promise.all([
+      getDailySweepMap({
+        interval: "5min",
+        session: focus.session,
+        mode: "reversal",
+        day: focus.day,
+        direction: focus.direction,
+        sweep: focus.sweep,
+        minN: 1,
+        minEdge: 0
+      }),
+      getDailySweepMap({
+        interval: "15min",
+        session: focus.session,
+        mode: "reversal",
+        day: focus.day,
+        direction: focus.direction,
+        sweep: focus.sweep,
+        minN: 1,
+        minEdge: 0
+      }),
+      getDailySweepMap({ interval: "1h", session: "PM", mode: "reversal", minN: 5, minEdge: 45 })
+    ]);
 
     return [
       "ICT definition used here: a sweep means the later candle takes the target high/low; reversal means it closes back inside; continuation means it closes outside.",
+      "Daily level definition used here: PDH/PDL sweep means the current session takes the previous daily high or previous daily low; reversal means it closes back inside that prior daily level.",
       ...maps.flatMap((map) => [
         `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} to ${map.meta.to}, all times America/New_York. Available intraday bars in this file currently run through ${map.meta.availableEnd || "the regular close"}.`,
         `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel} overall reversal read: ${map.summary.weightedEdge}%.`,
         ...map.rows.slice(0, 3).map(
           (row) => plainRowLine(`ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
+        )
+      ]),
+      ...dailyMaps.flatMap((map) => [
+        `Daily levels ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}, intraday ${map.meta.from} to ${map.meta.to}; all-time daily file ${map.meta.dailyFrom} to ${map.meta.dailyTo}.`,
+        `All-time daily levels: previous daily high swept ${map.dailySummary.highSweepFrequency}%, previous daily low swept ${map.dailySummary.lowSweepFrequency}%, both sides swept ${map.dailySummary.bothSidesFrequency}%.`,
+        ...map.rows.slice(0, 3).map(
+          (row) => plainDailySweepLine(`Daily levels ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
         )
       ])
     ];

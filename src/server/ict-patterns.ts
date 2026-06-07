@@ -124,7 +124,7 @@ function mean(values: number[]) {
 }
 
 function points(value: number) {
-  return value * 100;
+  return value;
 }
 
 function wilson(successes: number, total: number) {

@@ -135,6 +135,74 @@ type DataAudit = {
   };
 };
 
+type DailySweepRow = {
+  id: string;
+  day: string;
+  level: "PDH" | "PDL";
+  sweep: string;
+  direction: "HIGH" | "LOW";
+  trade: string;
+  n: number;
+  opportunities: number;
+  frequency: number;
+  reversal: number;
+  continuation: number;
+  edge: number;
+  depth: number;
+  rejection: number;
+};
+
+type DailySweepPayload = {
+  meta: {
+    interval: IctInterval;
+    intervalLabel: string;
+    session: IctSession;
+    sessionLabel: string;
+    mode: PatternMode;
+    from: string;
+    to: string;
+    dailyFrom: string;
+    dailyTo: string;
+    intradayTradingDays: number;
+    dailyTradingDays: number;
+    symbol: string;
+    exchange: string;
+  };
+  dailySummary: {
+    opportunities: number;
+    highSweepFrequency: number;
+    lowSweepFrequency: number;
+    bothSidesFrequency: number;
+    highSweepReversal: number;
+    lowSweepReversal: number;
+    highSweepContinuation: number;
+    lowSweepContinuation: number;
+    averageHighSweepDepth: number;
+    averageLowSweepDepth: number;
+    averageHighSweepRejection: number;
+    averageLowSweepRejection: number;
+  };
+  directionSummaries: Array<{
+    direction: "HIGH" | "LOW";
+    label: string;
+    frequency: number;
+    reversal: number;
+    continuation: number;
+    edge: number;
+    averageDepth: number;
+    averageRejection: number;
+    action: string;
+  }>;
+  summary: {
+    patterns: number;
+    sweepEvents: number;
+    weightedEdge: number;
+    topEdge: DailySweepRow | null;
+  };
+  watchlist: DailySweepRow[];
+  rows: DailySweepRow[];
+};
+
 const days = ["ALL", "MON", "TUE", "WED", "THU", "FRI"];
 const timeframes: Array<{ value: IctInterval; label: string; description: string }> = [
   { value: "5min", label: "5M", description: "fine intraday sweep map" },
@@ -149,6 +217,8 @@ const sessions: Array<{ value: IctSession; label: string; description: string }>
   { value: "PM", label: "PM", description: "12:00-close" }
 ];
 const suggestions = [
+  "Previous daily low sweep stats?",
+  "Previous daily high reversal?",
   "Friday 12:00 low sweep?",
   "Friday outlook?",
   "Reversal vs continuation?",
@@ -333,8 +403,10 @@ function PatternCard({ row, mode }: { row: IctPatternRow; mode: PatternMode }) {
 
 export function IctPatternTerminal() {
   const [data, setData] = useState<IctPatternPayload | null>(null);
+  const [dailySweeps, setDailySweeps] = useState<DailySweepPayload | null>(null);
   const [audit, setAudit] = useState<DataAudit | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dailyLoading, setDailyLoading] = useState(true);
   const [mode, setMode] = useState<PatternMode>("reversal");
   const [interval, setInterval] = useState<IctInterval>("15min");
   const [session, setSession] = useState<IctSession>("PM");
@@ -375,6 +447,24 @@ export function IctPatternTerminal() {
     return params.toString();
   }, [day, direction, from, interval, minCiLow, minEdge, minN, mode, session, sweepTime, targetTime, to]);
 
+  const dailySweepQuery = useMemo(() => {
+    const params = new URLSearchParams({
+      mode,
+      interval,
+      session,
+      day,
+      direction,
+      sweep: sweepTime,
+      minN: String(minN),
+      minEdge: String(minEdge)
+    });
+
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+
+    return params.toString();
+  }, [day, direction, from, interval, minEdge, minN, mode, session, sweepTime, to]);
+
   useEffect(() => {
     setTargetTime("ALL");
     setSweepTime("ALL");
@@ -397,6 +487,24 @@ export function IctPatternTerminal() {
       mounted = false;
     };
   }, [query]);
+
+  useEffect(() => {
+    let mounted = true;
+    setDailyLoading(true);
+
+    fetch(`/api/daily-sweeps?${dailySweepQuery}`)
+      .then((response) => response.json())
+      .then((payload: DailySweepPayload) => {
+        if (mounted) setDailySweeps(payload);
+      })
+      .finally(() => {
+        if (mounted) setDailyLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [dailySweepQuery]);
 
   useEffect(() => {
     let mounted = true;
@@ -489,6 +597,8 @@ export function IctPatternTerminal() {
   const topEdge = data?.summary.topEdge;
   const highSummary = data?.directionSummaries.find((item) => item.direction === "HIGH");
   const lowSummary = data?.directionSummaries.find((item) => item.direction === "LOW");
+  const pdhSummary = dailySweeps?.directionSummaries.find((item) => item.direction === "HIGH");
+  const pdlSummary = dailySweeps?.directionSummaries.find((item) => item.direction === "LOW");
   const activeInterval = timeframes.find((item) => item.value === interval);
   const activeSession = sessions.find((item) => item.value === session);
   const targetOptions = useMemo(() => buildTimeOptions(interval, "ALL"), [interval]);
@@ -765,6 +875,95 @@ export function IctPatternTerminal() {
                 </TerminalPanel>
               ) : null
             )}
+          </div>
+        </TerminalPanel>
+
+        <TerminalPanel className="p-3 sm:p-4">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">
+                {"// DAILY HIGH / LOW SWEEPS"}
+              </div>
+              <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#6f8f99]">
+                Previous daily high and low sweeps from real {dailySweeps?.meta.symbol ?? "^NDX"} data
+              </div>
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#86a4ac]">
+              Daily file: {dailySweeps?.meta.dailyFrom ?? "--"} -&gt; {dailySweeps?.meta.dailyTo ?? "--"} /{" "}
+              {formatCount(dailySweeps?.meta.dailyTradingDays ?? 0)} trading days
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <TerminalPanel className="p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// Full daily history"}</div>
+              <div className="mt-3 grid gap-2 text-[11px] text-[#9eb8c0] sm:grid-cols-2">
+                <StatLine label="PDH swept" value={`${dailySweeps?.dailySummary.highSweepFrequency ?? 0}%`} />
+                <StatLine label="PDL swept" value={`${dailySweeps?.dailySummary.lowSweepFrequency ?? 0}%`} />
+                <StatLine label="Both sides" value={`${dailySweeps?.dailySummary.bothSidesFrequency ?? 0}%`} />
+                <StatLine label="Days read" value={formatCount(dailySweeps?.dailySummary.opportunities ?? 0)} />
+              </div>
+            </TerminalPanel>
+
+            {[pdhSummary, pdlSummary].map((summary) =>
+              summary ? (
+                <TerminalPanel key={summary.direction} className="p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">
+                    {summary.direction === "HIGH" ? "// Previous daily high" : "// Previous daily low"}
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <StatLine label="Sweep frequency" value={`${summary.frequency}%`} />
+                    <StatLine label="Reversal" value={`${summary.reversal}%`} />
+                    <StatLine label="Continuation" value={`${summary.continuation}%`} />
+                    <StatLine label="Avg depth" value={`${summary.averageDepth} pts`} />
+                    <StatLine label="Avg rejection" value={`${summary.averageRejection} pts`} />
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.14em]",
+                      summary.direction === "HIGH" ? "bg-[#d17e83] text-white" : "bg-[#78ad8e] text-[#06130d]"
+                    )}
+                  >
+                    {summary.action}
+                  </div>
+                </TerminalPanel>
+              ) : null
+            )}
+          </div>
+
+          <div className="mt-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// PDH / PDL timing watchlist"}</div>
+            <div className="mt-2 space-y-2">
+              {dailyLoading ? (
+                <div className="flex h-20 items-center justify-center">
+                  <Loader2 className="size-4 animate-spin text-[#9fd4e6]" />
+                </div>
+              ) : dailySweeps?.watchlist.length ? (
+                dailySweeps.watchlist.map((row) => (
+                  <motion.div
+                    key={row.id}
+                    layout
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="grid gap-2 border-b border-[#24414d] py-2 text-[11px] md:grid-cols-[64px_84px_92px_78px_minmax(0,1fr)] md:items-center md:gap-3"
+                  >
+                    <span className="font-black text-[#d8edf2]">{row.day}</span>
+                    <span className={row.level === "PDL" ? "font-black text-[#92c9a4]" : "font-black text-[#d98991]"}>
+                      {row.level} SWEEP
+                    </span>
+                    <span className="text-[#8eaab2]">{row.sweep}</span>
+                    <span className={cn("w-16 px-2 py-1 text-center text-[10px] font-black", scoreTone(row.edge))}>{row.edge}%</span>
+                    <span className="min-w-0 text-[#8eaab2] md:truncate">
+                      {row.trade} - freq {row.frequency}% - depth {row.depth} pts - rejection {row.rejection} pts
+                    </span>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-[#7898a2]">
+                  {"// No PDH/PDL sweep patterns at current thresholds. Adjust filters."}
+                </div>
+              )}
+            </div>
           </div>
         </TerminalPanel>
 
