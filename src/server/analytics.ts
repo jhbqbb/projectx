@@ -158,6 +158,7 @@ function buildHeatmap(summary: StatSummary) {
 export async function loadLatestDataset(ownerId?: string | null, datasetId?: string | null) {
   const where = {
     status: "READY" as const,
+    interval: { not: "DAILY" as const },
     ...(ownerId ? { ownerId } : {}),
     ...(datasetId ? { id: datasetId } : {})
   };
@@ -174,25 +175,21 @@ export async function getAnalyticsSnapshot(params: { ownerId?: string | null; da
     const dataset = (await loadLatestDataset(params.ownerId, params.datasetId)) as unknown as DatasetRecord | null;
 
     if (!dataset || !dataset.tradingDays.length) {
-      return noDataSnapshot();
+      return noDataSnapshot("No minute-candle dataset has been ingested yet. Use Alpha Vantage intraday access or upload 1min/15min OHLCV.");
     }
 
     const sessions = dataset.tradingDays.map((day) => rowToSessionDay(day as Record<string, unknown>));
     const summary = calculateStatSummary(sessions);
 
     if (!summary.sampleSize) {
-      return noDataSnapshot("The latest dataset exists, but it does not contain enough session data for statistics.");
+      return noDataSnapshot("The latest minute-candle dataset exists, but it does not contain enough session data for statistics.");
     }
 
     const patterns = findPatternCandidates(sessions);
-    const dataModeWarning =
-      dataset.interval === "DAILY"
-        ? "Alpha Vantage intraday data was unavailable for this key, so the platform is using real daily OHLCV fallback: prior close -> open context and open -> close response."
-        : "Alpha Vantage US equity intraday extended-hours coverage is 4:00am to 8:00pm ET; overnight futures-style sessions need a different data source.";
     const warnings = [
       ...(summary.sampleSize < 250 ? ["Sample size is modest. Treat this as descriptive research, not proof of an edge."] : []),
       ...(summary.confidence < 60 ? ["Confidence is below 60. Validate on a larger holdout period."] : []),
-      dataModeWarning
+      "Alpha Vantage US equity intraday extended-hours coverage is 4:00am to 8:00pm ET; overnight futures-style sessions need a different data source."
     ];
 
     return {

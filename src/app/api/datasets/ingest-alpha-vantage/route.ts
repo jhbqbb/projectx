@@ -7,9 +7,8 @@ import { ingestAlphaVantageDataset } from "@/server/ingestion";
 
 const ingestSchema = z.object({
   ticker: z.string().min(1).max(12).default("QQQ"),
-  interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).default("5min"),
-  month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-  mode: z.enum(["auto", "daily"]).default("auto")
+  interval: z.enum(["1min", "5min", "15min", "30min", "60min"]).default("15min"),
+  month: z.string().regex(/^\d{4}-\d{2}$/).optional()
 });
 
 async function getIngestionOwner(request: NextRequest) {
@@ -45,8 +44,7 @@ export async function POST(request: NextRequest) {
       ownerId: user.id,
       ticker: body.ticker,
       interval: body.interval,
-      month: body.month,
-      mode: body.mode
+      month: body.month
     });
 
     return NextResponse.json({ dataset });

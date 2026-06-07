@@ -8,8 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function IngestionForm() {
-  const [interval, setIntervalValue] = useState("5min");
-  const [mode, setMode] = useState("daily");
+  const [interval, setIntervalValue] = useState("15min");
   const [status, setStatus] = useState<{ tone: "success" | "error" | "idle"; message: string }>({
     tone: "idle",
     message: ""
@@ -32,7 +31,6 @@ export function IngestionForm() {
         body: JSON.stringify({
           ticker,
           interval,
-          mode,
           ...(month ? { month } : {})
         })
       });
@@ -78,25 +76,13 @@ export function IngestionForm() {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>Data mode</Label>
-        <Select value={mode} onValueChange={setMode}>
-          <SelectTrigger className="border-white/10 bg-black/20">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="daily">Daily OHLCV</SelectItem>
-            <SelectItem value="auto">Intraday, then daily fallback</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
         <Label htmlFor="month">Historical month</Label>
         <Input id="month" name="month" placeholder="2026-05" className="border-white/10 bg-black/20" />
         <p className="text-xs leading-5 text-muted-foreground">
-          Month is used for intraday mode. Daily OHLCV uses the latest Alpha Vantage compact history.
+          Minute-candle Alpha Vantage requests require intraday access. Use 1 minute or 15 minute when the key supports it.
         </p>
       </div>
-      <div className="flex items-start pt-8 md:col-span-2">
+      <div className="flex items-start pt-8">
         <Button variant="premium" className="w-full" disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
           Fetch Alpha Vantage
