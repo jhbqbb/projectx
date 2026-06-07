@@ -37,20 +37,92 @@ async function writeText(controller: ReadableStreamDefaultController<Uint8Array>
   }
 }
 
-async function getIctCalculations() {
+function normalizeQuestionTime(value: string) {
+  const match = value.toLowerCase().match(/\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?\b/);
+
+  if (!match) {
+    return null;
+  }
+
+  let hour = Number(match[1]);
+  const minute = match[2] ?? "00";
+  const meridiem = match[3];
+
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (hour > 23) return null;
+
+  return `${String(hour).padStart(2, "0")}:${minute}`;
+}
+
+function parseQuestionFocus(question: string) {
+  const lower = question.toLowerCase();
+  const dayEntries = [
+    ["MON", /\bmon(day)?\b/],
+    ["TUE", /\btue(sday)?\b/],
+    ["WED", /\bwed(nesday)?\b/],
+    ["THU", /\bthu(rsday)?\b/],
+    ["FRI", /\bfri(day)?\b/]
+  ] as const;
+  const day = dayEntries.find(([, pattern]) => pattern.test(lower))?.[0] ?? "ALL";
+  const direction = lower.includes("low sweep") || lower.includes("takes low")
+    ? "LOW"
+    : lower.includes("high sweep") || lower.includes("takes high")
+      ? "HIGH"
+      : "BOTH";
+  const timeMatches = [...question.matchAll(/\b(?:\d{1,2}:[0-5]\d\s*(?:am|pm)?|\d{1,2}\s*(?:am|pm))\b/gi)]
+    .map((match) => normalizeQuestionTime(match[0]))
+    .filter((time): time is string => Boolean(time));
+  const target = timeMatches[0] ?? "ALL";
+  const sweep = timeMatches[1] ?? "ALL";
+  const session = lower.includes("pm") || lower.includes("afternoon") || (target !== "ALL" && target >= "12:00") ? "PM" : "ALL";
+
+  return { day, direction, target, sweep, session } as const;
+}
+
+function evidenceLabel(value: number) {
+  if (value >= 30) return "stronger historical read";
+  if (value >= 12) return "usable but still limited historical read";
+  return "thin historical read";
+}
+
+function plainRowLine(prefix: string, row: Awaited<ReturnType<typeof getIctPatternMap>>["rows"][number], mode: string) {
+  const direction = row.direction === "LOW" ? "low sweep" : "high sweep";
+  const bias = row.trade
+    .replace("LONG", "long")
+    .replace("SHORT", "short")
+    .replace("(fade)", "fade")
+    .replace("(follow break down)", "follow breakdown")
+    .replace("(follow break up)", "follow breakout");
+
+  return `${prefix} ${row.day} ${row.target} to ${row.sweep} ${direction}: ${row.edge}% ${mode} read. Bias: ${bias}. Average sweep depth ${row.depth} points and rejection ${row.rejection} points. Evidence: ${evidenceLabel(row.n)}.`;
+}
+
+async function getIctCalculations(question: string) {
   try {
-    const maps = await Promise.all(
-      (["15min", "1h", "4h"] as const).map((interval) =>
-        getIctPatternMap({ interval, mode: "reversal", minN: interval === "4h" ? 3 : 10, minEdge: 50 })
-      )
-    );
+    const focus = parseQuestionFocus(question);
+    const maps = await Promise.all([
+      getIctPatternMap({
+        interval: "15min",
+        session: focus.session,
+        mode: "reversal",
+        day: focus.day,
+        direction: focus.direction,
+        target: focus.target,
+        sweep: focus.sweep,
+        minN: 1,
+        minEdge: 0
+      }),
+      getIctPatternMap({ interval: "15min", session: "PM", mode: "reversal", minN: 10, minEdge: 48 }),
+      getIctPatternMap({ interval: "1h", mode: "reversal", minN: 8, minEdge: 50 }),
+      getIctPatternMap({ interval: "4h", mode: "reversal", minN: 3, minEdge: 50 })
+    ]);
 
     return maps.flatMap((map) => [
-      `ICT ${map.meta.intervalLabel} dataset: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} -> ${map.meta.to}, ${map.meta.tradingDays} trading days, ${map.meta.totalCandles} candles, all times America/New_York.`,
-      `ICT ${map.meta.intervalLabel} reversal map: ${map.summary.patterns} visible patterns; ${map.summary.sweepEvents} sweep events; sample-weighted edge ${map.summary.weightedEdge}%.`,
+      `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} to ${map.meta.to}, all times America/New_York. Available intraday bars in this file currently run through ${map.meta.availableEnd || "the regular close"}.`,
+      `ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel} overall reversal read: ${map.summary.weightedEdge}%.`,
       ...map.rows.slice(0, 3).map(
-        (row) =>
-          `${map.meta.intervalLabel} ${row.day} ${row.target} -> ${row.sweep} ${row.direction.toLowerCase()} sweep: ${row.edge}% ${map.meta.mode}, CI [${row.ciLow}-${row.ciHigh}], n=${row.n}/${row.opportunities}, depth ${row.depth} pts, rejection ${row.rejection} pts, trade ${row.trade}.`
+        (row) => plainRowLine(`ICT ${map.meta.intervalLabel} ${map.meta.sessionLabel}`, row, map.meta.mode)
       )
     ]);
   } catch {
@@ -61,7 +133,7 @@ async function getIctCalculations() {
 export async function POST(request: NextRequest) {
   const body = chatSchema.parse(await request.json());
   const snapshot = await getResearchSnapshot();
-  const ictCalculations = await getIctCalculations();
+  const ictCalculations = await getIctCalculations(body.message);
   const context = buildResearchContext({
     question: body.message,
     selectedReports: body.selectedReports,

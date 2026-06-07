@@ -38,6 +38,8 @@ Real Nasdaq-tracking QQQ OHLCV CSV files are published as static website assets:
 
 In Settings, use the bundled OHLCV ingest buttons to load the supported minute files server-side into PostgreSQL. This still requires a working `DATABASE_URL`, because ingested candles and derived session statistics are stored in the database. When Vercel has no usable database, the AI and ICT pattern terminal read the bundled 15M, 1H, and 4H files directly for deterministic research answers.
 
+The ICT terminal includes a PM research view for New York `12:00` through the available close. The current bundled Twelve Data files are regular-session files and do not include `16:00-16:30` after-hours bars. Twelve Data exposes pre/post-market candles through `prepost=true`, but the current key must be on a plan that supports extended-hours data before those bars can be fetched and bundled.
+
 ## Report Modules
 
 - Context vs Regular Session

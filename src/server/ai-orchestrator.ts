@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { REPORT_MODULES } from "@/lib/constants";
-import { buildQuestionSql, isReadOnlyAnalyticsSql } from "@/server/sql-guard";
+import { buildQuestionSql } from "@/server/sql-guard";
 import { calculateStatSummary, findPatternCandidates } from "@/server/statistics";
 import type { SessionDay } from "@/types";
 
@@ -45,7 +45,7 @@ export function buildResearchContext(params: {
   const calculations = [
     ...(hasSessionData
       ? [
-          `Sample size: ${summary.sampleSize} valid session days`,
+          "Historical session coverage is available.",
           `Context bullish -> response bearish: ${summary.contextBullishRegularBearish}%`,
           `Context bearish -> response bullish: ${summary.contextBearishRegularBullish}%`,
           `Same-direction continuation probability: ${summary.continuation}%`,
@@ -87,12 +87,12 @@ export function buildResearchContext(params: {
     ],
     warnings: [
       ...(!hasData ? [params.noDataReason ?? "No historical dataset is available yet."] : []),
-      ...(hasSessionData && summary.sampleSize < 50 ? ["Low sample size: fewer than 50 valid session days."] : []),
+      ...(hasSessionData && summary.sampleSize < 50 ? ["Thin historical coverage: treat this as a weak read."] : []),
       ...(hasSessionData && summary.confidence < 60 ? ["Confidence below 60: treat as hypothesis, not a trading rule."] : []),
       ...(hasIctData ? ["ICT sweep patterns are descriptive historical statistics; validate out of sample before trading."] : []),
       ...patterns
         .filter((pattern) => pattern.sampleSize < 30)
-        .map((pattern) => `${pattern.label} has only ${pattern.sampleSize} samples.`)
+        .map((pattern) => `${pattern.label} has thin historical coverage.`)
     ],
     sourceDatasets: params.sourceDatasets?.length ? params.sourceDatasets : []
   };
@@ -119,7 +119,7 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
       "",
       ...context.ictCalculations.slice(0, 12),
       "",
-      "Risk flags: these are descriptive historical statistics, not causal rules. Low-n rows and wide confidence intervals should be treated as weak samples.",
+      "Risk flags: these are descriptive historical statistics, not causal rules. Thin historical reads should be treated carefully.",
       "",
       `Follow-ups: ${context.followUps.join(" ")}`
     ].join("\n");
@@ -132,7 +132,7 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
   const patternLines = strongestExpectancyPatterns.length
     ? strongestExpectancyPatterns.map(
         (pattern, index) =>
-          `${index + 1}. ${pattern.label}: expectancy ${pattern.expectancy}%, average absolute move ${pattern.averageMove}%, reversal rate ${pattern.reversalRate}%, sample size ${pattern.sampleSize}, confidence ${pattern.confidence}/100, risk ${pattern.risk}.`
+          `${index + 1}. ${pattern.label}: expectancy ${pattern.expectancy}%, average absolute move ${pattern.averageMove}%, reversal rate ${pattern.reversalRate}%, confidence ${pattern.confidence}/100, risk ${pattern.risk}.`
       )
     : ["No qualified pattern candidates were found in the current dataset."];
 
@@ -145,9 +145,6 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
     `The strongest directional read is context bearish -> response bullish at ${context.summary.contextBearishRegularBullish}% across the valid sample. Context bullish -> response bearish is ${context.summary.contextBullishRegularBearish}%, and same-direction continuation is ${context.summary.continuation}%.`,
     "",
     `Average absolute response-session move is ${context.summary.averageMove}%, median move is ${context.summary.medianMove}%, maximum observed move is ${context.summary.maximumMove}%, and signed expectancy is ${context.summary.expectancy}%. Confidence is ${context.summary.confidence}/100 based on sample size, dispersion, and data coverage.`,
-    "",
-    "SQL plan:",
-    context.sql,
     "",
     context.warnings.length ? `Risk flags: ${context.warnings.join(" ")}` : "Risk flags: no major sample-size warnings in this run.",
     "",
@@ -166,9 +163,10 @@ All times must be written in America/New_York local time.
 Understand ICT-style terminology as research labels only: liquidity sweep, high sweep, low sweep, wick through a prior candle level, close back inside, reversal/fade, continuation/follow-through, displacement, opening range, session timing, and sample-quality risk.
 Answer broadly across trading research topics: sessions, gaps, opens, ranges, sweeps, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
 If ICT sweep map calculations are supplied, answer from those real QQQ OHLCV calculations even when the database session snapshot is unavailable.
-Explain findings in plain English, include sample size, probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.
+Explain findings in plain English with probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.
+Do not expose raw notation such as n=, CI brackets, SQL snippets, variable names, row IDs, or formula-style output unless the user explicitly asks for technical details.
+Prefer short text answers: state the setup, the reversal or continuation read, the bias, and the risk in normal trading language.
 If no dataset exists, say "No data available yet" and tell the user to ingest Twelve Data minute candles or upload OHLCV.
-When SQL is shown, keep it read-only and analytical.
 When a sample is weak, say so clearly.
 
 Available report modules:
@@ -187,12 +185,9 @@ Pattern candidates:
 ${context.patterns
   .map(
     (pattern) =>
-      `${pattern.label}: expectancy ${pattern.expectancy}%, average move ${pattern.averageMove}%, reversal rate ${pattern.reversalRate}%, sample size ${pattern.sampleSize}, confidence ${pattern.confidence}/100, risk ${pattern.risk}`
+      `${pattern.label}: expectancy ${pattern.expectancy}%, average move ${pattern.averageMove}%, reversal rate ${pattern.reversalRate}%, confidence ${pattern.confidence}/100, risk ${pattern.risk}`
   )
-  .join("\n")}
-
-Approved SQL:
-${isReadOnlyAnalyticsSql(context.sql) ? context.sql : "SQL withheld because it failed safety checks."}`;
+  .join("\n")}`;
 }
 
 export function getOpenAIClient() {

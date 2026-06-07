@@ -4,6 +4,7 @@
   "providerSymbol": "QQQ",
   "providerExchange": "NASDAQ",
   "providerMicCode": "XNMS",
+  "extendedHours": false,
   "timestampFormat": "ISO-8601 UTC",
   "columns": [
     "timestamp",

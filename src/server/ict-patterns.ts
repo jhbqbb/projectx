@@ -30,12 +30,16 @@ type IctCandle = {
 type SweepDirection = "HIGH" | "LOW";
 type PatternMode = "reversal" | "continuation";
 type IctInterval = "15min" | "1h" | "4h";
+type IctSession = "ALL" | "AM" | "PM";
 
 export type IctPatternFilters = {
   mode?: PatternMode;
   interval?: IctInterval;
+  session?: IctSession;
   day?: string;
   direction?: "BOTH" | SweepDirection;
+  target?: string;
+  sweep?: string;
   minN?: number;
   minEdge?: number;
   minCiLow?: number;
@@ -101,6 +105,11 @@ const intervalMeta: Record<IctInterval, { label: string; file: string; responseC
   "15min": { label: "15M", file: "nasdaq-qqq-15min-ohlcv.csv", responseCandles: 0 },
   "1h": { label: "1H", file: "nasdaq-qqq-1h-ohlcv.csv", responseCandles: 2 },
   "4h": { label: "4H", file: "nasdaq-qqq-4h-ohlcv.csv", responseCandles: 1 }
+};
+const sessionMeta: Record<IctSession, { label: string; start: string; end: string }> = {
+  ALL: { label: "Full session", start: "09:30", end: "16:30" },
+  AM: { label: "AM session", start: "09:30", end: "11:45" },
+  PM: { label: "PM session", start: "12:00", end: "16:30" }
 };
 
 function round(value: number, digits = 1) {
@@ -238,16 +247,13 @@ function toRow(accumulator: PatternAccumulator, mode: PatternMode): IctPatternRo
   };
 }
 
-function responseCloseFor(candles: IctCandle[], dayCandles: IctCandle[], sweep: IctCandle, sweepIndex: number, interval: IctInterval) {
+function responseCloseFor(dayCandles: IctCandle[], sweepIndex: number, interval: IctInterval) {
   if (interval === "15min") {
     const response = dayCandles.slice(sweepIndex + 1);
     return response[response.length - 1]?.close ?? null;
   }
 
-  const globalIndex = candles.findIndex((candle) => candle.timestamp.getTime() === sweep.timestamp.getTime());
-  const responseIndex = globalIndex + intervalMeta[interval].responseCandles;
-
-  return globalIndex >= 0 ? candles[responseIndex]?.close ?? null : null;
+  return dayCandles[sweepIndex + intervalMeta[interval].responseCandles]?.close ?? null;
 }
 
 function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilters>) {
@@ -264,7 +270,7 @@ function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilt
 
       for (let sweepIndex = targetIndex + 1; sweepIndex < day.candles.length; sweepIndex += 1) {
         const sweep = day.candles[sweepIndex];
-        const responseClose = responseCloseFor(candles, day.candles, sweep, sweepIndex, filters.interval);
+        const responseClose = responseCloseFor(day.candles, sweepIndex, filters.interval);
 
         if (!responseClose) {
           continue;
@@ -334,6 +340,8 @@ function buildPatternRows(candles: IctCandle[], filters: Required<IctPatternFilt
     .map((accumulator) => toRow(accumulator, filters.mode))
     .filter((row) => filters.day === "ALL" || row.day.toUpperCase() === filters.day)
     .filter((row) => filters.direction === "BOTH" || row.direction === filters.direction)
+    .filter((row) => filters.target === "ALL" || row.target === filters.target)
+    .filter((row) => filters.sweep === "ALL" || row.sweep === filters.sweep)
     .filter((row) => row.n >= filters.minN)
     .filter((row) => row.edge >= filters.minEdge)
     .filter((row) => row.ciLow >= filters.minCiLow)
@@ -353,7 +361,7 @@ function summarizeDirection(rows: IctPatternRow[], direction: SweepDirection, mo
   return {
     direction,
     label: direction === "HIGH" ? "Wicks up - takes high" : "Wicks down - takes low",
-    frequencyText: `${n} / ${Math.max(1, opportunities)} (${round((n / Math.max(1, opportunities)) * 100, 0)}%)`,
+    frequencyText: `${round((n / Math.max(1, opportunities)) * 100, 0)}% of matching chances`,
     reversal: round(n ? (reversals / n) * 100 : 0, 1),
     continuation: round(n ? (continuations / n) * 100 : 0, 1),
     ci: `[${round(ci.low, 0)}-${round(ci.high, 0)}]`,
@@ -378,8 +386,53 @@ function applyDateRange(candles: IctCandle[], from: string, to: string) {
   return candles.filter((candle) => candle.nyDate >= from && candle.nyDate <= to);
 }
 
+function applySessionRange(candles: IctCandle[], session: IctSession) {
+  if (session === "ALL") {
+    return candles;
+  }
+
+  const sessionRange = sessionMeta[session];
+
+  return candles.filter((candle) => candle.time >= sessionRange.start && candle.time <= sessionRange.end);
+}
+
+function addClockMinutes(time: string, minutes: number) {
+  const [hour, minute] = time.split(":").map(Number);
+  const total = hour * 60 + minute + minutes;
+
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function displayAvailableEnd(candles: IctCandle[], interval: IctInterval) {
+  const latest = candles.reduce((value, candle) => (candle.time > value ? candle.time : value), "");
+
+  if (!latest) {
+    return "";
+  }
+
+  const hasExtended = candles.some((candle) => candle.time > "16:00");
+
+  if (!hasExtended && latest >= "13:30") {
+    return "16:00";
+  }
+
+  if (!hasExtended && latest === "11:45") {
+    return "12:00";
+  }
+
+  return interval === "15min" ? addClockMinutes(latest, 15) : latest;
+}
+
 function normalizeInterval(interval?: string): IctInterval {
   return interval === "1h" || interval === "4h" ? interval : "15min";
+}
+
+function normalizeSession(session?: string): IctSession {
+  return session === "AM" || session === "PM" ? session : "ALL";
+}
+
+function normalizeTimeFilter(time?: string) {
+  return time && /^\d{2}:\d{2}$/.test(time) ? time : "ALL";
 }
 
 function normalizeFilters(filters: IctPatternFilters, defaults: { from: string; to: string }): Required<IctPatternFilters> {
@@ -387,12 +440,16 @@ function normalizeFilters(filters: IctPatternFilters, defaults: { from: string; 
   const direction = filters.direction === "HIGH" || filters.direction === "LOW" ? filters.direction : "BOTH";
   const day = filters.day?.toUpperCase() ?? "ALL";
   const interval = normalizeInterval(filters.interval);
+  const session = normalizeSession(filters.session);
 
   return {
     mode,
     interval,
+    session,
     direction,
     day: ["ALL", "MON", "TUE", "WED", "THU", "FRI"].includes(day) ? day : "ALL",
+    target: normalizeTimeFilter(filters.target),
+    sweep: normalizeTimeFilter(filters.sweep),
     minN: Math.max(1, Number(filters.minN ?? 10)),
     minEdge: clamp(Number(filters.minEdge ?? 50), 0, 100),
     minCiLow: clamp(Number(filters.minCiLow ?? 0), 0, 100),
@@ -405,7 +462,7 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
   const interval = normalizeInterval(filters.interval);
   const loaded = await loadCandles(interval);
   const normalized = normalizeFilters(filters, { from: loaded.from, to: loaded.to });
-  const rangedCandles = applyDateRange(loaded.candles, normalized.from, normalized.to);
+  const rangedCandles = applySessionRange(applyDateRange(loaded.candles, normalized.from, normalized.to), normalized.session);
   const rows = buildPatternRows(rangedCandles, normalized);
   const visibleRows = rows.slice(0, 120);
   const topEdge = visibleRows[0] ?? null;
@@ -420,6 +477,11 @@ export async function getIctPatternMap(filters: IctPatternFilters = {}) {
       timezone: NY_TIME_ZONE,
       interval: normalized.interval,
       intervalLabel: intervalMeta[normalized.interval].label,
+      session: normalized.session,
+      sessionLabel: sessionMeta[normalized.session].label,
+      sessionStart: sessionMeta[normalized.session].start,
+      sessionEnd: sessionMeta[normalized.session].end,
+      availableEnd: displayAvailableEnd(rangedCandles, normalized.interval),
       mode: normalized.mode,
       from: normalized.from,
       to: normalized.to,

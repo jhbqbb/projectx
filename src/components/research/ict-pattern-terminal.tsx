@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Loader2, Mic, Send, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Mic, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 type PatternMode = "reversal" | "continuation";
 type SweepDirection = "BOTH" | "HIGH" | "LOW";
 type IctInterval = "15min" | "1h" | "4h";
+type IctSession = "ALL" | "AM" | "PM";
 type LookupMode = "exact" | "loose" | "situational" | "custom";
 
 type IctPatternRow = {
@@ -51,6 +52,11 @@ type IctPatternPayload = {
     timezone: string;
     interval: IctInterval;
     intervalLabel: string;
+    session: IctSession;
+    sessionLabel: string;
+    sessionStart: string;
+    sessionEnd: string;
+    availableEnd: string;
     mode: PatternMode;
     from: string;
     to: string;
@@ -65,8 +71,11 @@ type IctPatternPayload = {
   filters: {
     mode: PatternMode;
     interval: IctInterval;
+    session: IctSession;
     day: string;
     direction: SweepDirection;
+    target: string;
+    sweep: string;
     minN: number;
     minEdge: number;
     minCiLow: number;
@@ -90,12 +99,17 @@ const timeframes: Array<{ value: IctInterval; label: string; description: string
   { value: "1h", label: "1H", description: "hourly reaction map" },
   { value: "4h", label: "4H", description: "macro reaction map" }
 ];
+const sessions: Array<{ value: IctSession; label: string; description: string }> = [
+  { value: "ALL", label: "ALL", description: "full available day" },
+  { value: "AM", label: "AM", description: "09:30-11:45" },
+  { value: "PM", label: "PM", description: "12:00-close" }
+];
 const suggestions = [
-  "Strongest low sweep reversals?",
+  "Friday 12:00 low sweep?",
   "Friday outlook?",
   "Reversal vs continuation?",
-  "Best hour overall?",
-  "Weak samples?"
+  "Best PM low sweep?",
+  "Weak setups?"
 ];
 const lookupConfigs: Record<Exclude<LookupMode, "custom">, { minN: number; minEdge: number; minCiLow: number }> = {
   exact: { minN: 10, minEdge: 50, minCiLow: 0 },
@@ -115,6 +129,48 @@ function addMonths(date: Date, months: number) {
 
 function toIsoDate(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function buildTimeOptions(interval: IctInterval, session: IctSession) {
+  const intervalTimes = {
+    "15min": [
+      "09:30",
+      "09:45",
+      "10:00",
+      "10:15",
+      "10:30",
+      "10:45",
+      "11:00",
+      "11:15",
+      "11:30",
+      "11:45",
+      "12:00",
+      "12:15",
+      "12:30",
+      "12:45",
+      "13:00",
+      "13:15",
+      "13:30",
+      "13:45",
+      "14:00",
+      "14:15",
+      "14:30",
+      "14:45",
+      "15:00",
+      "15:15",
+      "15:30",
+      "15:45"
+    ],
+    "1h": ["09:30", "10:30", "11:30", "12:30", "13:30", "14:30", "15:30"],
+    "4h": ["09:30", "13:30"]
+  } satisfies Record<IctInterval, string[]>;
+  const times = intervalTimes[interval].filter((time) => {
+    if (session === "AM") return time < "12:00";
+    if (session === "PM") return time >= "12:00";
+    return true;
+  });
+
+  return ["ALL", ...times];
 }
 
 function scoreTone(value: number) {
@@ -195,10 +251,10 @@ function PatternCard({ row, mode }: { row: IctPatternRow; mode: PatternMode }) {
         <span className={cn("min-w-14 px-2 py-1 text-center text-[11px] font-black", scoreTone(row.edge))}>{row.edge}%</span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-[#9eb8c0]">
-        <div>N {row.n}/{row.opportunities}</div>
-        <div>Freq {row.frequency}%</div>
-        <div>{mode} CI [{row.ciLow}-{row.ciHigh}]</div>
+        <div>Frequency {row.frequency}%</div>
+        <div>{mode} {row.edge}%</div>
         <div>Depth {row.depth} pts</div>
+        <div>Rejection {row.rejection} pts</div>
       </div>
       <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#d8edf2]">{row.trade}</div>
     </motion.div>
@@ -210,9 +266,12 @@ export function IctPatternTerminal() {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<PatternMode>("reversal");
   const [interval, setInterval] = useState<IctInterval>("15min");
+  const [session, setSession] = useState<IctSession>("PM");
   const [lookupMode, setLookupMode] = useState<LookupMode>("exact");
   const [day, setDay] = useState("ALL");
   const [direction, setDirection] = useState<SweepDirection>("BOTH");
+  const [targetTime, setTargetTime] = useState("ALL");
+  const [sweepTime, setSweepTime] = useState("ALL");
   const [minN, setMinN] = useState(10);
   const [minEdge, setMinEdge] = useState(50);
   const [minCiLow, setMinCiLow] = useState(0);
@@ -222,15 +281,18 @@ export function IctPatternTerminal() {
   const [aiHidden, setAiHidden] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
   const [chatInput, setChatInput] = useState("");
-  const [chatAnswer, setChatAnswer] = useState("Ready. Ask about sweeps, reversals, continuations, session timing, or sample quality.");
+  const [chatAnswer, setChatAnswer] = useState("Ready. Ask about sweeps, reversals, continuations, session timing, or data quality.");
   const [chatLoading, setChatLoading] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
       mode,
       interval,
+      session,
       day,
       direction,
+      target: targetTime,
+      sweep: sweepTime,
       minN: String(minN),
       minEdge: String(minEdge),
       minCiLow: String(minCiLow)
@@ -240,7 +302,12 @@ export function IctPatternTerminal() {
     if (to) params.set("to", to);
 
     return params.toString();
-  }, [day, direction, from, interval, minCiLow, minEdge, minN, mode, to]);
+  }, [day, direction, from, interval, minCiLow, minEdge, minN, mode, session, sweepTime, targetTime, to]);
+
+  useEffect(() => {
+    setTargetTime("ALL");
+    setSweepTime("ALL");
+  }, [interval, session]);
 
   useEffect(() => {
     let mounted = true;
@@ -281,11 +348,6 @@ export function IctPatternTerminal() {
     setMinCiLow(lookupConfigs[next].minCiLow);
   }
 
-  function setNumberFilter(setter: (value: number) => void, value: string) {
-    setLookupMode("custom");
-    setter(Math.max(0, Number(value)));
-  }
-
   async function askAi(prompt = chatInput) {
     const question = prompt.trim();
     if (!question || chatLoading) return;
@@ -300,7 +362,7 @@ export function IctPatternTerminal() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `Use New York local time and ICT sweep terminology. Current terminal filters: interval=${interval}, mode=${mode}, day=${day}, direction=${direction}, minN=${minN}, minEdge=${minEdge}, minCiLow=${minCiLow}. Question: ${question}`,
+          message: `Use New York local time and answer in plain text without raw count notation. Current terminal view: ${interval.toUpperCase()} ${session} session, ${mode}, day ${day}, direction ${direction}, target ${targetTime}, sweep ${sweepTime}. Question: ${question}`,
           selectedReports: ["ict-pattern-map", "session-reversal", "session-continuation"]
         })
       });
@@ -340,6 +402,8 @@ export function IctPatternTerminal() {
   const highSummary = data?.directionSummaries.find((item) => item.direction === "HIGH");
   const lowSummary = data?.directionSummaries.find((item) => item.direction === "LOW");
   const activeInterval = timeframes.find((item) => item.value === interval);
+  const activeSession = sessions.find((item) => item.value === session);
+  const timeOptions = useMemo(() => buildTimeOptions(interval, session), [interval, session]);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-black px-2 py-4 font-mono text-[#d8edf2] sm:px-4 lg:px-6">
@@ -358,12 +422,17 @@ export function IctPatternTerminal() {
               {`// ${data?.meta.title ?? "PROJECTX QQQ 15M ICT Pattern Map"}`}
             </div>
             <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#7fa1aa]">
-              {data?.meta.subtitle ?? "Loading Nasdaq statistics"} - Timezone: America/New_York
+              {data?.meta.subtitle ?? "Loading Nasdaq statistics"} - {data?.meta.sessionLabel ?? activeSession?.description} - Timezone: America/New_York
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {timeframes.map((item) => (
               <TinyButton key={item.value} active={interval === item.value} onClick={() => setInterval(item.value)}>
+                {item.label}
+              </TinyButton>
+            ))}
+            {sessions.map((item) => (
+              <TinyButton key={item.value} active={session === item.value} onClick={() => setSession(item.value)}>
                 {item.label}
               </TinyButton>
             ))}
@@ -472,12 +541,12 @@ export function IctPatternTerminal() {
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// DATE RANGE"}</div>
               <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#6f8f99]">
-                {activeInterval?.label} - {activeInterval?.description} - source {data?.meta.provider ?? "Twelve Data"}
+                {activeInterval?.label} - {activeInterval?.description} - {activeSession?.description} - source {data?.meta.provider ?? "Twelve Data"}
               </div>
             </div>
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#86a4ac]">
               {data
-                ? `${data.meta.from} -> ${data.meta.to} - ${formatCount(data.meta.tradingDays)} trading days - ${formatCount(data.meta.sweepEvents)} sweep events`
+                ? `${data.meta.from} -> ${data.meta.to} - ${formatCount(data.meta.tradingDays)} trading days - available through ${data.meta.availableEnd || "close"}`
                 : "Loading"}
             </div>
           </div>
@@ -528,7 +597,7 @@ export function IctPatternTerminal() {
                   <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{`// ${summary.label}`}</div>
                   <div className="mt-3 space-y-1">
                     <StatLine label="Sweep frequency" value={summary.frequencyText} />
-                    <StatLine label="Reversal" value={`${summary.reversal}% ${summary.ci}`} />
+                    <StatLine label="Reversal" value={`${summary.reversal}%`} />
                     <StatLine label="Continuation" value={`${summary.continuation}%`} />
                     <StatLine label="Avg depth" value={`${summary.averageDepth} pts`} />
                     <StatLine label="Avg rejection" value={`${summary.averageRejection} pts`} />
@@ -575,30 +644,22 @@ export function IctPatternTerminal() {
                     {item}
                   </TinyButton>
                 ))}
-                <span className="ml-0 flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">
-                  <SlidersHorizontal className="size-3" />
-                  Min n
-                </span>
-                <Input
-                  type="number"
-                  value={minN}
-                  onChange={(event) => setNumberFilter(setMinN, event.target.value)}
-                  className="h-8 w-20 rounded-none border-[#284553] bg-[#07151b] text-[11px]"
-                />
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2]">Min edge</span>
-                <Input
-                  type="number"
-                  value={minEdge}
-                  onChange={(event) => setNumberFilter(setMinEdge, event.target.value)}
-                  className="h-8 w-20 rounded-none border-[#284553] bg-[#07151b] text-[11px]"
-                />
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2]">Min CI LO</span>
-                <Input
-                  type="number"
-                  value={minCiLow}
-                  onChange={(event) => setNumberFilter(setMinCiLow, event.target.value)}
-                  className="h-8 w-20 rounded-none border-[#284553] bg-[#07151b] text-[11px]"
-                />
+                <span className="ml-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">Target</span>
+                <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
+                  {timeOptions.map((item) => (
+                    <TinyButton key={`target-${item}`} active={targetTime === item} onClick={() => setTargetTime(item)}>
+                      {item}
+                    </TinyButton>
+                  ))}
+                </div>
+                <span className="ml-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#7898a2] sm:ml-2">Sweep</span>
+                <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
+                  {timeOptions.map((item) => (
+                    <TinyButton key={`sweep-${item}`} active={sweepTime === item} onClick={() => setSweepTime(item)}>
+                      {item}
+                    </TinyButton>
+                  ))}
+                </div>
               </div>
             </TerminalPanel>
           ) : null}
@@ -608,7 +669,7 @@ export function IctPatternTerminal() {
           {`// ${mode === "reversal" ? "REVERSAL MODE" : "CONTINUATION MODE"} - Target candle level is swept by a later candle. Edge is calculated from the response path.`}
         </div>
         <div className="border-l-2 border-[#9fd4e6] bg-[#10242d] px-3 py-2 text-[10px] font-semibold text-[#9eb8c0]">
-          Each row: day, target candle, sweep candle, direction. Edge uses 95% Wilson CI. Date range above filters every calculation.
+          Each row is calculated from real historical QQQ candles. Date range, session, day, direction, target, and sweep filters change every calculation.
         </div>
 
         <TerminalPanel className="p-3 sm:p-4">
@@ -638,7 +699,7 @@ export function IctPatternTerminal() {
                     </span>
                     <span className={cn("w-16 px-2 py-1 text-center text-[10px] font-black", scoreTone(row.edge))}>{row.edge}%</span>
                     <span className="min-w-0 text-[#8eaab2] md:truncate">
-                      {row.trade} - n={row.n}/{row.opportunities} - CI {row.ciLow}-{row.ciHigh} - depth {row.depth}
+                      {row.trade} - depth {row.depth} pts - rejection {row.rejection} pts
                     </span>
                   </motion.div>
                 ))
@@ -659,10 +720,10 @@ export function IctPatternTerminal() {
           </TerminalPanel>
           <TerminalPanel className="p-4">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">
-              {`// Weighted ${mode === "reversal" ? "reversal" : "continuation"}`}
+              {`// Overall ${mode === "reversal" ? "reversal" : "continuation"}`}
             </div>
             <div className="mt-2 text-3xl font-black">{data?.summary.weightedEdge ?? 0}%</div>
-            <div className="mt-1 text-[10px] text-[#7898a2]">Sample-weighted across visible</div>
+            <div className="mt-1 text-[10px] text-[#7898a2]">Across visible setups</div>
           </TerminalPanel>
           <TerminalPanel className="p-4 ring-1 ring-[#9fd4e6]/60">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9fc7d1]">{"// Top edge"}</div>
@@ -671,7 +732,7 @@ export function IctPatternTerminal() {
             </div>
             <div className="mt-2 text-[11px] text-[#9eb8c0]">
               {topEdge
-                ? `${topEdge.direction.toLowerCase()} sweep - ${topEdge.edge}% [CI ${topEdge.ciLow}-${topEdge.ciHigh}] - n=${topEdge.n}`
+                ? `${topEdge.direction.toLowerCase()} sweep - ${topEdge.edge}% ${mode} read`
                 : "No match"}
             </div>
           </TerminalPanel>
@@ -692,10 +753,10 @@ export function IctPatternTerminal() {
         </div>
 
         <TerminalPanel className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[980px] border-collapse text-left text-[11px]">
+          <table className="w-full min-w-[860px] border-collapse text-left text-[11px]">
             <thead className="bg-[#07151b] text-[10px] font-black uppercase tracking-[0.18em] text-[#8db3bd]">
               <tr>
-                {["Day", "Target", "Sweeps", "Dir", "Trade", "N", "Freq", mode, "95% CI", "Depth", "Rejection"].map((header) => (
+                {["Day", "Target", "Sweeps", "Dir", "Trade", "Freq", mode, "Depth", "Rejection"].map((header) => (
                   <th key={header} className="border-b border-[#24414d] px-4 py-3">
                     {header}
                   </th>
@@ -705,7 +766,7 @@ export function IctPatternTerminal() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-14 text-center text-[#8db3bd]">
+                  <td colSpan={9} className="px-4 py-14 text-center text-[#8db3bd]">
                     <Loader2 className="mx-auto size-5 animate-spin" />
                   </td>
                 </tr>
@@ -719,21 +780,17 @@ export function IctPatternTerminal() {
                       {row.direction} SWEEP
                     </td>
                     <td className="px-4 py-3">{row.trade}</td>
-                    <td className="px-4 py-3">
-                      {row.n}/{row.opportunities}
-                    </td>
                     <td className="px-4 py-3">{row.frequency}%</td>
                     <td className="px-4 py-2">
                       <span className={cn("inline-flex min-w-14 justify-center px-3 py-1 font-black", scoreTone(row.edge))}>{row.edge}</span>
                     </td>
-                    <td className="px-4 py-3">[{row.ciLow}-{row.ciHigh}]</td>
                     <td className="px-4 py-3">{row.depth}</td>
                     <td className="px-4 py-3">{row.rejection}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={11} className="px-4 py-12 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-[#7898a2]">
+                  <td colSpan={9} className="px-4 py-12 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-[#7898a2]">
                     {"// No patterns match filters. Adjust thresholds or date range."}
                   </td>
                 </tr>

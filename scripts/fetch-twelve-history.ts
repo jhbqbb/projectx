@@ -7,6 +7,7 @@ const SYMBOL = "QQQ";
 const PLATFORM_TICKER = "NASDAQ";
 const OUTPUT_SIZE = 5000;
 const REQUEST_DELAY_MS = 8200;
+const INCLUDE_PREPOST = process.env.TWELVE_DATA_PREPOST === "true";
 
 type Interval = "1min" | "15min" | "1h" | "4h";
 
@@ -112,6 +113,10 @@ async function fetchPage(apiKey: string, interval: Interval, endDate?: Date) {
     order: "ASC",
     apikey: apiKey
   });
+
+  if (INCLUDE_PREPOST) {
+    query.set("prepost", "true");
+  }
 
   if (endDate) {
     query.set("end_date", dateToNy(endDate));
@@ -239,6 +244,7 @@ async function main() {
         providerSymbol: SYMBOL,
         providerExchange: "NASDAQ",
         providerMicCode: "XNMS",
+        extendedHours: INCLUDE_PREPOST,
         timestampFormat: "ISO-8601 UTC",
         columns: ["timestamp", "open", "high", "low", "close", "volume"],
         files: intervals
