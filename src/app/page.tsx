@@ -1,5 +1,5 @@
-import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
+import { IctPatternTerminal } from "@/components/research/ict-pattern-terminal";
 
 export default function DashboardPage() {
-  return <DashboardOverview />;
+  return <IctPatternTerminal />;
 }

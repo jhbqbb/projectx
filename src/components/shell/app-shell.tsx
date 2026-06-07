@@ -26,6 +26,11 @@ const titles: Record<string, string> = {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const pageTitle = titles[pathname] ?? "Research";
+  const terminalRoute = pathname === "/" || pathname === "/pattern-explorer";
+
+  if (terminalRoute) {
+    return <div className="min-h-screen bg-black text-foreground">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#08090b] text-foreground">

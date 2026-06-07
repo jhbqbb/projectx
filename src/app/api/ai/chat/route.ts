@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { buildResearchContext, buildSystemInstructions, createFallbackAnswer, getOpenAIClient } from "@/server/ai-orchestrator";
+import { getIctPatternMap } from "@/server/ict-patterns";
 import { getResearchSnapshot } from "@/server/research-snapshot";
 
 const chatSchema = z.object({
@@ -36,15 +37,35 @@ async function writeText(controller: ReadableStreamDefaultController<Uint8Array>
   }
 }
 
+async function getIctCalculations() {
+  try {
+    const map = await getIctPatternMap({ mode: "reversal", minN: 10, minEdge: 50 });
+    const topRows = map.rows.slice(0, 6);
+
+    return [
+      `ICT sweep map dataset: ${map.meta.symbol} on ${map.meta.exchange}/${map.meta.micCode}, ${map.meta.from} -> ${map.meta.to}, ${map.meta.tradingDays} trading days, ${map.meta.totalCandles} 15-minute candles, all times America/New_York.`,
+      `Visible reversal patterns: ${map.summary.patterns}; sweep events: ${map.summary.sweepEvents}; sample-weighted reversal edge: ${map.summary.weightedEdge}%.`,
+      ...topRows.map(
+        (row) =>
+          `${row.day} ${row.target} -> ${row.sweep} ${row.direction.toLowerCase()} sweep: ${row.edge}% ${map.meta.mode}, CI [${row.ciLow}-${row.ciHigh}], n=${row.n}/${row.opportunities}, depth ${row.depth} pts, rejection ${row.rejection} pts, trade ${row.trade}.`
+      )
+    ];
+  } catch {
+    return [];
+  }
+}
+
 export async function POST(request: NextRequest) {
   const body = chatSchema.parse(await request.json());
   const snapshot = await getResearchSnapshot();
+  const ictCalculations = await getIctCalculations();
   const context = buildResearchContext({
     question: body.message,
     selectedReports: body.selectedReports,
     days: snapshot.sessions,
     sourceDatasets: snapshot.dataset ? [`${snapshot.dataset.name} (${snapshot.dataset.source})`] : [],
-    noDataReason: snapshot.noDataReason
+    noDataReason: snapshot.noDataReason,
+    ictCalculations
   });
   const encoder = new TextEncoder();
   const openai = getOpenAIClient();
@@ -67,10 +88,10 @@ export async function POST(request: NextRequest) {
           input: body.message,
           stream: true,
           reasoning: {
-            effort: envChoice(process.env.OPENAI_REASONING_EFFORT, reasoningEfforts, "low")
+            effort: envChoice(process.env.OPENAI_REASONING_EFFORT, reasoningEfforts, "medium")
           },
           text: {
-            verbosity: envChoice(process.env.OPENAI_VERBOSITY, verbosityLevels, "low")
+            verbosity: envChoice(process.env.OPENAI_VERBOSITY, verbosityLevels, "medium")
           },
           max_output_tokens: envPositiveInteger(process.env.OPENAI_MAX_OUTPUT_TOKENS, 1200),
           store: false

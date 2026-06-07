@@ -8,6 +8,7 @@ export type ResearchContext = {
   summary: ReturnType<typeof calculateStatSummary>;
   sql: string;
   calculations: string[];
+  ictCalculations: string[];
   patterns: ReturnType<typeof findPatternCandidates>;
   chartSpec: Array<{ type: string; title: string; metric: string }>;
   followUps: string[];
@@ -23,6 +24,7 @@ export function buildResearchContext(params: {
   days?: SessionDay[];
   sourceDatasets?: string[];
   noDataReason?: string;
+  ictCalculations?: string[];
 }): ResearchContext {
   const days = params.days ?? [];
   const summary = calculateStatSummary(days);
@@ -58,6 +60,7 @@ export function buildResearchContext(params: {
     summary,
     sql,
     calculations,
+    ictCalculations: params.ictCalculations ?? [],
     patterns,
     chartSpec: [
       { type: "bar", title: "Directional Probabilities", metric: "probability" },
@@ -68,7 +71,8 @@ export function buildResearchContext(params: {
       "Split the condition by weekday and month.",
       "Compare gap direction, opening drive, and first-hour behavior.",
       "Run the same condition on a holdout period only.",
-      "Find common characteristics across reversal and continuation days."
+      "Find common characteristics across reversal and continuation days.",
+      "Compare low sweep fade setups by New York hour."
     ],
     warnings: [
       ...(!hasData ? [params.noDataReason ?? "No historical dataset is available yet."] : []),
@@ -132,7 +136,9 @@ export function buildSystemInstructions(context: ResearchContext) {
 
 Use the deterministic statistics provided by the platform as source of truth.
 Do not invent trades, live prices, or causal certainty.
-Answer broadly across trading research topics: sessions, gaps, opens, ranges, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
+All times must be written in America/New_York local time.
+Understand ICT-style terminology as research labels only: liquidity sweep, high sweep, low sweep, wick through a prior candle level, close back inside, reversal/fade, continuation/follow-through, displacement, opening range, session timing, and sample-quality risk.
+Answer broadly across trading research topics: sessions, gaps, opens, ranges, sweeps, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
 Explain findings in plain English, include sample size, probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.
 If no dataset exists, say "No data available yet" and tell the user to ingest Twelve Data minute candles or upload OHLCV.
 When SQL is shown, keep it read-only and analytical.
@@ -146,6 +152,9 @@ ${context.sourceDatasets.join(", ")}
 
 Deterministic calculations:
 ${context.calculations.join("\n")}
+
+ICT sweep map calculations:
+${context.ictCalculations.length ? context.ictCalculations.join("\n") : "No ICT sweep map calculations were supplied."}
 
 Pattern candidates:
 ${context.patterns
