@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAnalyticsSnapshot, type AnalyticsSnapshot } from "@/server/analytics";
+import { getBundledResearchSnapshot } from "@/server/bundled-research-data";
 import { ingestTwelveDataDataset } from "@/server/ingestion";
 
 type SnapshotParams = {
@@ -30,7 +31,29 @@ function withNoDataReason(snapshot: AnalyticsSnapshot, reason: string): Analytic
   };
 }
 
+function shouldUseBundledBeforeDatabase() {
+  const databaseUrl = process.env.DATABASE_URL ?? "";
+  let isLocalDatabase = false;
+
+  try {
+    const hostname = new URL(databaseUrl).hostname;
+    isLocalDatabase = hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    isLocalDatabase = /(^|[@/])(localhost|127\.0\.0\.1)(:|\/)/i.test(databaseUrl);
+  }
+
+  return !databaseUrl || (process.env.VERCEL && isLocalDatabase);
+}
+
 export async function getResearchSnapshot(params: SnapshotParams = {}): Promise<AnalyticsSnapshot> {
+  if (!params.datasetId && shouldUseBundledBeforeDatabase()) {
+    try {
+      return await getBundledResearchSnapshot();
+    } catch {
+      // Fall through to the database/provider path if the bundled file is unavailable.
+    }
+  }
+
   const requested = await getAnalyticsSnapshot({
     ownerId: params.ownerId,
     datasetId: params.datasetId
@@ -46,6 +69,12 @@ export async function getResearchSnapshot(params: SnapshotParams = {}): Promise<
     if (globalSnapshot.hasData) {
       return globalSnapshot;
     }
+  }
+
+  try {
+    return await getBundledResearchSnapshot();
+  } catch {
+    // Keep going to provider/database ingestion when bundled assets are unavailable.
   }
 
   if (params.autoIngest === false) {
