@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { hashPassword } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { buildResearchContext, buildSystemInstructions, createFallbackAnswer, getOpenAIClient } from "@/server/ai-orchestrator";
-import { getAnalyticsSnapshot } from "@/server/analytics";
+import { getAnalyticsSnapshot, type AnalyticsSnapshot } from "@/server/analytics";
+import { ingestTwelveDataDataset } from "@/server/ingestion";
 
 const chatSchema = z.object({
   message: z.string().min(1),
@@ -11,6 +15,8 @@ const chatSchema = z.object({
 
 const reasoningEfforts = ["minimal", "low", "medium", "high", "xhigh"] as const;
 const verbosityLevels = ["low", "medium", "high"] as const;
+
+export const maxDuration = 60;
 
 function envChoice<T extends readonly string[]>(value: string | undefined, allowed: T, fallback: T[number]): T[number] {
   return allowed.includes(value ?? "") ? (value as T[number]) : fallback;
@@ -34,9 +40,49 @@ async function writeText(controller: ReadableStreamDefaultController<Uint8Array>
   }
 }
 
+async function getResearchOwner() {
+  return prisma.user.upsert({
+    where: { email: "local@research.internal" },
+    update: {},
+    create: {
+      email: "local@research.internal",
+      name: "Local Research Owner",
+      passwordHash: await hashPassword(`local-${randomUUID()}`)
+    },
+    select: { id: true }
+  });
+}
+
+async function getSnapshotWithAutoIngest(): Promise<AnalyticsSnapshot> {
+  const snapshot = await getAnalyticsSnapshot();
+
+  if (snapshot.hasData || !process.env.TWELVE_DATA_API_KEY) {
+    return snapshot;
+  }
+
+  try {
+    const owner = await getResearchOwner();
+    await ingestTwelveDataDataset({
+      ownerId: owner.id,
+      ticker: "NASDAQ",
+      interval: "15min"
+    });
+
+    return getAnalyticsSnapshot();
+  } catch (error) {
+    return {
+      ...snapshot,
+      noDataReason:
+        error instanceof Error
+          ? `No dataset is available yet, and automatic Twelve Data ingestion failed: ${error.message}`
+          : "No dataset is available yet, and automatic Twelve Data ingestion failed."
+    };
+  }
+}
+
 export async function POST(request: NextRequest) {
   const body = chatSchema.parse(await request.json());
-  const snapshot = await getAnalyticsSnapshot();
+  const snapshot = await getSnapshotWithAutoIngest();
   const context = buildResearchContext({
     question: body.message,
     selectedReports: body.selectedReports,
@@ -85,15 +131,9 @@ export async function POST(request: NextRequest) {
         }
 
         controller.close();
-      } catch (error) {
-        controller.enqueue(
-          encoder.encode(
-            sse({
-              type: "error",
-              error: error instanceof Error ? error.message : "AI research stream failed."
-            })
-          )
-        );
+      } catch {
+        await writeText(controller, encoder, createFallbackAnswer(body.message, context));
+        controller.enqueue(encoder.encode(sse({ type: "done" })));
         controller.close();
       }
     }

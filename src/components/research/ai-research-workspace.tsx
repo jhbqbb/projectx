@@ -343,7 +343,7 @@ export function AIResearchWorkspace() {
               <div key={source} className="rounded-md border border-white/8 bg-black/20 p-3 text-sm">
                 <div className="font-medium">{source}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {context?.hasData ? "Session normalized to America/New_York" : "Ingest Alpha Vantage data in Settings"}
+                  {context?.hasData ? "Session normalized to America/New_York" : "Ingest Twelve Data in Settings"}
                 </div>
               </div>
             ))}

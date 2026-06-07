@@ -387,6 +387,7 @@ export function findPatternCandidates(days: SessionDay[]) {
       const sample = valid.filter(condition.filter);
       const reversed = sample.filter((day) => day.regularReversedContext);
       const moves = sample.map((day) => Math.abs(day.regularMovePct ?? 0));
+      const signedMoves = sample.map((day) => day.regularMovePct ?? 0);
       const summary = summarizeGroup(sample, condition.id, condition.label);
 
       return {
@@ -395,6 +396,7 @@ export function findPatternCandidates(days: SessionDay[]) {
         sampleSize: sample.length,
         reversalRate: sample.length ? round((reversed.length / sample.length) * 100, 1) : 0,
         averageMove: round(mean(moves), 2),
+        expectancy: round(mean(signedMoves), 2),
         confidence: summary.confidence,
         risk:
           sample.length < 30

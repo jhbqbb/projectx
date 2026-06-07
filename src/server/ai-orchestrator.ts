@@ -8,6 +8,7 @@ export type ResearchContext = {
   summary: ReturnType<typeof calculateStatSummary>;
   sql: string;
   calculations: string[];
+  patterns: ReturnType<typeof findPatternCandidates>;
   chartSpec: Array<{ type: string; title: string; metric: string }>;
   followUps: string[];
   warnings: string[];
@@ -27,7 +28,11 @@ export function buildResearchContext(params: {
   const summary = calculateStatSummary(days);
   const hasData = days.length > 0 && summary.sampleSize > 0;
   const sql = hasData ? buildQuestionSql(params.question, params.selectedReports) : "No SQL plan yet. Ingest data first.";
-  const patterns = hasData ? findPatternCandidates(days).slice(0, 3) : [];
+  const patterns = hasData ? findPatternCandidates(days) : [];
+  const strongestExpectancyPatterns = patterns
+    .filter((pattern) => pattern.sampleSize > 0)
+    .sort((a, b) => b.expectancy - a.expectancy)
+    .slice(0, 3);
   const calculations = [
     ...(hasData
       ? [
@@ -38,9 +43,13 @@ export function buildResearchContext(params: {
           `Average response-session move: ${summary.averageMove}%`,
           `Median response-session move: ${summary.medianMove}%`,
           `Expectancy: ${summary.expectancy}%`,
-          `Standard deviation: ${summary.standardDeviation}%`
+          `Standard deviation: ${summary.standardDeviation}%`,
+          ...strongestExpectancyPatterns.map(
+            (pattern) =>
+              `${pattern.label}: ${pattern.expectancy}% expectancy, ${pattern.averageMove}% average absolute move, ${pattern.sampleSize} samples`
+          )
         ]
-      : ["No historical dataset is available yet. Ingest Alpha Vantage data or upload OHLCV first."])
+      : ["No historical dataset is available yet. Ingest Twelve Data minute candles or upload OHLCV first."])
   ];
 
   return {
@@ -49,6 +58,7 @@ export function buildResearchContext(params: {
     summary,
     sql,
     calculations,
+    patterns,
     chartSpec: [
       { type: "bar", title: "Directional Probabilities", metric: "probability" },
       { type: "heatmap", title: "Weekday x Trading Condition", metric: "win_rate" },
@@ -77,12 +87,26 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
     return [
       `No data available yet for: "${question}".`,
       "",
-      "Ingest historical Alpha Vantage OHLCV data or upload a dataset first. After ingestion, I can analyze any trading question across reports, patterns, sessions, weekdays, gaps, ranges, opens, and reversals."
+      "Ingest Twelve Data minute-candle data or upload an OHLCV dataset first. After ingestion, I can analyze trading questions across reports, patterns, sessions, weekdays, gaps, ranges, opens, and reversals."
     ].join("\n");
   }
 
+  const strongestExpectancyPatterns = context.patterns
+    .filter((pattern) => pattern.sampleSize > 0)
+    .sort((a, b) => b.expectancy - a.expectancy)
+    .slice(0, 5);
+  const patternLines = strongestExpectancyPatterns.length
+    ? strongestExpectancyPatterns.map(
+        (pattern, index) =>
+          `${index + 1}. ${pattern.label}: expectancy ${pattern.expectancy}%, average absolute move ${pattern.averageMove}%, reversal rate ${pattern.reversalRate}%, sample size ${pattern.sampleSize}, confidence ${pattern.confidence}/100, risk ${pattern.risk}.`
+      )
+    : ["No qualified pattern candidates were found in the current dataset."];
+
   return [
     `I analyzed the available historical trading dataset for: "${question}".`,
+    "",
+    "Strongest response-session expectancy patterns:",
+    ...patternLines,
     "",
     `The strongest directional read is context bearish -> response bullish at ${context.summary.contextBearishRegularBullish}% across the valid sample. Context bullish -> response bearish is ${context.summary.contextBullishRegularBearish}%, and same-direction continuation is ${context.summary.continuation}%.`,
     "",
@@ -118,6 +142,14 @@ ${context.sourceDatasets.join(", ")}
 
 Deterministic calculations:
 ${context.calculations.join("\n")}
+
+Pattern candidates:
+${context.patterns
+  .map(
+    (pattern) =>
+      `${pattern.label}: expectancy ${pattern.expectancy}%, average move ${pattern.averageMove}%, reversal rate ${pattern.reversalRate}%, sample size ${pattern.sampleSize}, confidence ${pattern.confidence}/100, risk ${pattern.risk}`
+  )
+  .join("\n")}
 
 Approved SQL:
 ${isReadOnlyAnalyticsSql(context.sql) ? context.sql : "SQL withheld because it failed safety checks."}`;
