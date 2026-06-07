@@ -1,4 +1,4 @@
-# Nasdaq Research Terminal
+# ProjectX
 
 Private trading research workspace inspired by the Edgeful-style workflow, built from scratch with Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, PostgreSQL, Prisma, Alpha Vantage, and the OpenAI Responses API.
 
