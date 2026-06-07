@@ -23,15 +23,15 @@ export const NY_TIME_ZONE = "America/New_York";
 
 export const SESSION_WINDOWS = {
   context: {
-    label: "Premarket Context",
-    start: "04:00",
-    end: "09:25",
+    label: "Opening Context",
+    start: "09:30",
+    end: "09:59",
     timezone: NY_TIME_ZONE
   },
   newYork: {
-    label: "Regular Session",
-    start: "09:30",
-    end: "16:00",
+    label: "Response Session",
+    start: "10:00",
+    end: "15:59",
     timezone: NY_TIME_ZONE
   }
 } as const;

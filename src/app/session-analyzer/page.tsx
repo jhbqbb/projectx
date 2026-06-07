@@ -72,7 +72,7 @@ export default function SessionAnalyzerPage() {
             <div className="text-2xl font-semibold">
               {SESSION_WINDOWS.context.start} {"->"} {SESSION_WINDOWS.context.end}
             </div>
-            <div className="mt-2 text-sm text-muted-foreground">Alpha Vantage extended-hours coverage</div>
+            <div className="mt-2 text-sm text-muted-foreground">Twelve Data minute-candle context window</div>
           </CardContent>
         </Card>
         <Card className="border-white/10 bg-white/[0.035]">
@@ -83,7 +83,9 @@ export default function SessionAnalyzerPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{SESSION_WINDOWS.newYork.start}</div>
+            <div className="text-2xl font-semibold">
+              {SESSION_WINDOWS.newYork.start} {"->"} {SESSION_WINDOWS.newYork.end}
+            </div>
             <div className="mt-2 text-sm text-muted-foreground">Response session anchor</div>
           </CardContent>
         </Card>

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAnalyticsSnapshot } from "@/server/analytics";
+import { getResearchSnapshot } from "@/server/research-snapshot";
+
+export const maxDuration = 60;
 
 export async function GET() {
-  const snapshot = await getAnalyticsSnapshot();
+  const snapshot = await getResearchSnapshot();
   return NextResponse.json({
     hasData: snapshot.hasData,
     dataset: snapshot.dataset,

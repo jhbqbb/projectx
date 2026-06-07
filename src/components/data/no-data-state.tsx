@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function NoDataState({
   title = "No data available yet",
-  reason = "Ingest Alpha Vantage historical data or upload OHLCV data to begin.",
+  reason = "Ingest Twelve Data minute candles or upload OHLCV data to begin.",
   showAction = true
 }: {
   title?: string;

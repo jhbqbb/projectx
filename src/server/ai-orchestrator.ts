@@ -87,8 +87,12 @@ export function createFallbackAnswer(question: string, context: ResearchContext)
     return [
       `No data available yet for: "${question}".`,
       "",
+      context.noDataReason ? `Reason: ${context.noDataReason}` : "",
+      "",
       "Ingest Twelve Data minute-candle data or upload an OHLCV dataset first. After ingestion, I can analyze trading questions across reports, patterns, sessions, weekdays, gaps, ranges, opens, and reversals."
-    ].join("\n");
+    ]
+      .filter((line, index, lines) => line || lines[index - 1])
+      .join("\n");
   }
 
   const strongestExpectancyPatterns = context.patterns
@@ -130,7 +134,7 @@ Use the deterministic statistics provided by the platform as source of truth.
 Do not invent trades, live prices, or causal certainty.
 Answer broadly across trading research topics: sessions, gaps, opens, ranges, reversals, continuations, weekdays, volatility, expectancy, sample quality, and hidden patterns.
 Explain findings in plain English, include sample size, probability, average move, median move, expectancy, standard deviation, confidence, warnings, and overfitting risk when data exists.
-If no dataset exists, say "No data available yet" and tell the user to ingest Alpha Vantage data or upload OHLCV.
+If no dataset exists, say "No data available yet" and tell the user to ingest Twelve Data minute candles or upload OHLCV.
 When SQL is shown, keep it read-only and analytical.
 When a sample is weak, say so clearly.
 

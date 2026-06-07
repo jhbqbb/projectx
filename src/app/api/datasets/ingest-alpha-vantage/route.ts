@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof Response) return error;
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to ingest Alpha Vantage data." },
+      { error: error instanceof Error ? error.message : "Unable to ingest market data." },
       { status: 400 }
     );
   }

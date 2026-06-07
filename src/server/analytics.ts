@@ -175,7 +175,7 @@ export async function getAnalyticsSnapshot(params: { ownerId?: string | null; da
     const dataset = (await loadLatestDataset(params.ownerId, params.datasetId)) as unknown as DatasetRecord | null;
 
     if (!dataset || !dataset.tradingDays.length) {
-      return noDataSnapshot("No minute-candle dataset has been ingested yet. Use Alpha Vantage intraday access or upload 1min/15min OHLCV.");
+      return noDataSnapshot("No minute-candle dataset has been ingested yet. Use Twelve Data 1min/15min data or upload minute OHLCV.");
     }
 
     const sessions = dataset.tradingDays.map((day) => rowToSessionDay(day as Record<string, unknown>));

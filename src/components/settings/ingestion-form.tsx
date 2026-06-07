@@ -26,7 +26,7 @@ export function IngestionForm() {
     const month = String(form.get("month") || "").trim();
 
     try {
-      const response = await fetch("/api/datasets/ingest-alpha-vantage", {
+      const response = await fetch("/api/datasets/ingest-market-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -42,7 +42,7 @@ export function IngestionForm() {
       };
 
       if (!response.ok || payload.error) {
-        throw new Error(payload.error ?? "Alpha Vantage ingestion failed.");
+        throw new Error(payload.error ?? "Market data ingestion failed.");
       }
 
       setStatus({
@@ -52,7 +52,7 @@ export function IngestionForm() {
     } catch (error) {
       setStatus({
         tone: "error",
-        message: error instanceof Error ? error.message : "Alpha Vantage ingestion failed."
+        message: error instanceof Error ? error.message : "Market data ingestion failed."
       });
     } finally {
       setLoading(false);

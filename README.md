@@ -1,19 +1,19 @@
 # ProjectX
 
-Private trading research workspace inspired by the Edgeful-style workflow, built from scratch with Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, PostgreSQL, Prisma, Alpha Vantage, and the OpenAI Responses API.
+Private trading research workspace inspired by the Edgeful-style workflow, built from scratch with Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, PostgreSQL, Prisma, Twelve Data, and the OpenAI Responses API.
 
 ## Architecture
 
 - `src/app` contains the App Router pages and route handlers.
 - `src/components` contains the SaaS workspace shell, AI chat, report surfaces, charting, and shadcn/ui primitives.
-- `src/server` contains ingestion, Alpha Vantage parsing, statistical analysis, report generation, SQL safety, and AI orchestration.
+- `src/server` contains ingestion, Twelve Data and Alpha Vantage parsing, statistical analysis, report generation, SQL safety, and AI orchestration.
 - `src/lib` contains Prisma, auth, shared utilities, and platform constants.
 - `prisma/schema.prisma` defines users, datasets, candles, trading-day aggregates, reports, studies, and AI research sessions.
 
 ## Workflow
 
 1. Register or sign in through the private auth routes.
-2. Ingest Nasdaq data from Alpha Vantage or upload OHLCV CSV data.
+2. Ingest Nasdaq data from Twelve Data or upload OHLCV CSV data.
 3. The ingestion service normalizes timestamps to `America/New_York`, derives context-session and regular-session features, and stores daily session aggregates.
 4. Reports and the pattern explorer run deterministic statistics first.
 5. AI Research streams a natural-language answer, references source datasets, shows the SQL/query plan, summarizes calculations, flags weak samples, and suggests follow-ups.
@@ -22,9 +22,9 @@ The dashboard, reports, pattern explorer, session analyzer, and AI source panel 
 
 ## Important Data Note
 
-Alpha Vantage's US equity intraday endpoint supports extended-hours bars from 4:00am to 8:00pm Eastern Time. Because that feed does not cover the full overnight futures-style window, the built-in session engine uses a covered context session of 04:00 -> 09:25 ET and regular session from 09:30 ET. Use uploaded futures/CFD/index data when a complete overnight session is required.
-
 The platform is configured for minute-candle research. Twelve Data is the default provider for `1min` and `15min` OHLCV data. Alpha Vantage can still be selected when the key has intraday access, and minute OHLCV CSV uploads are also supported. Daily candles are not used for dashboard, report, pattern, or AI research statistics. When Twelve Data pre/post-market access is not available, the engine uses 09:30-09:59 ET as opening context and 10:00-15:59 ET as the response session.
+
+Alpha Vantage can still be selected when the key has intraday access. Twelve Data pre/post-market data requires a paid provider plan; without that plan, ProjectX uses regular-session minute candles only.
 
 ## Report Modules
 
@@ -42,7 +42,7 @@ The platform is configured for minute-candle research. Twelve Data is the defaul
 
 - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
 - `GET /api/datasets`, `POST /api/datasets`
-- `POST /api/datasets/ingest-alpha-vantage`
+- `POST /api/datasets/ingest-market-data`
 - `POST /api/datasets/upload`
 - `GET /api/reports/[module]`
 - `GET /api/stats/session`
